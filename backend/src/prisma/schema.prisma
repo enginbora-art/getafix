@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      Role     @default(USER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  requests  ManualRequest[]
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  market      Market
+  date        DateTime @default(now())
+  content     String   @db.Text
+  jsonData    Json?
+  ticker      String?
+  entryLow    Float?
+  entryHigh   Float?
+  stopLoss    Float?
+  targetShort Float?
+  targetMid   Float?
+  riskLevel   String?
+  isClosing   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+enum Market {
+  BIST
+  US
+}
+
+model AgentConfig {
+  id           String   @id @default(cuid())
+  market       Market
+  agentName    String
+  systemPrompt String   @db.Text
+  updatedAt    DateTime @updatedAt
+  updatedBy    String?
+
+  @@unique([market, agentName])
+}
+
+model FilterConfig {
+  id          String   @id @default(cuid())
+  market      Market
+  configKey   String
+  configValue String
+  label       String
+  updatedAt   DateTime @updatedAt
+
+  @@unique([market, configKey])
+}
+
+model ManualRequest {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id])
+  market    Market
+  ticker    String
+  status    RequestStatus @default(PENDING)
+  result    String?       @db.Text
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+enum RequestStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+}
