@@ -2,6 +2,7 @@ services:
   - type: web
     name: getafix-api
     env: node
+    region: frankfurt
     buildCommand: cd backend && npm install && npx prisma generate --schema=src/prisma/schema.prisma && npx prisma migrate deploy --schema=src/prisma/schema.prisma
     startCommand: cd backend && node src/index.js
     envVars:
@@ -15,17 +16,25 @@ services:
         value: production
       - key: ANTHROPIC_API_KEY
         sync: false
-      - key: RESEND_API_KEY
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "465"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
         sync: false
       - key: EMAIL_FROM
         sync: false
       - key: FRONTEND_URL
         sync: false
 
-  - type: static
+  - type: web
     name: getafix-web
+    env: static
+    region: frankfurt
     buildCommand: cd frontend && npm install && npm run build
-    staticPublishPath: frontend/dist
+    staticPublishPath: ./frontend/dist
     routes:
       - type: rewrite
         source: /*
