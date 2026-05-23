@@ -1,10 +1,9 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const authMiddleware = require('../middleware/auth');
 const { generatePdf } = require('../services/pdf');
+const prisma = require('../lib/prisma');
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // GET /api/reports?market=BIST&limit=30
 router.get('/', authMiddleware, async (req, res) => {

@@ -1,8 +1,6 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
-const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
-
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 const BIST_AGENTS = {
   technical: `Sen agresif bir BIST momentum trader'ısın. Teknik analizde uzmanlaşmışsın.

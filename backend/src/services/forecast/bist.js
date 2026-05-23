@@ -1,10 +1,8 @@
-const { PrismaClient } = require('@prisma/client');
 const yahooFinance = require('yahoo-finance2').default;
 const { callAgent, callAgentWithWebSearch, summarizeForPeer } = require('./agents');
 const { prefilterBist, getBistFilters } = require('./screener');
 const { sendForecastEmail, sendErrorEmail } = require('../email');
-
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 
 // BIST 100 listesi — hardcoded fallback, production'da bist100.txt okunabilir
 const BIST_WATCHLIST = [

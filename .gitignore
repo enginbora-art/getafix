@@ -5,3 +5,7 @@ dist/
 prisma/migrations/
 *.log
 .vite/
+backend/.env.save
+backend/.env
+backend/.env.save
+backend/.env

@@ -1,7 +1,5 @@
 const { Resend } = require('resend');
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY);

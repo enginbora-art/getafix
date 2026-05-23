@@ -1,10 +1,8 @@
-const { PrismaClient } = require('@prisma/client');
 const yahooFinance = require('yahoo-finance2').default;
 const { callAgent, summarizeForPeer } = require('./agents');
 const { prefilterUs, getUsFilters } = require('./screener');
 const { sendForecastEmail } = require('../email');
-
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 
 // S&P 500 core + mid/small liquid universe (subset for demo)
 const US_WATCHLIST = [

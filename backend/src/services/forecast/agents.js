@@ -1,7 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
 const Anthropic = require('@anthropic-ai/sdk');
+const prisma = require('../../lib/prisma');
 
-const prisma = new PrismaClient();
 const client = new Anthropic({ maxRetries: 0 });
 
 const MODEL = 'claude-sonnet-4-6';
