@@ -32,7 +32,6 @@ services:
   - type: web
     name: getafix-web
     env: static
-    region: frankfurt
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
     routes:
