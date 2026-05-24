@@ -1,4 +1,4 @@
-const yahooFinance = require('yahoo-finance2').default;
+const yahooFinance = require('../../lib/yf');
 const { callAgent, callAgentWithWebSearch, summarizeForPeer } = require('./agents');
 const { prefilterBist, getBistFilters } = require('./screener');
 const { sendForecastEmail, sendErrorEmail } = require('../email');

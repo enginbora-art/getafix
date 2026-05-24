@@ -1,5 +1,5 @@
 const express = require('express');
-const yahooFinance = require('yahoo-finance2').default;
+const yahooFinance = require('../lib/yf');
 const authMiddleware = require('../middleware/auth');
 const prisma = require('../lib/prisma');
 
@@ -8,10 +8,24 @@ const router = express.Router();
 async function validateTicker(market, ticker) {
   const symbol = market === 'BIST' ? `${ticker}.IS` : ticker;
   try {
-    await yahooFinance.quote(symbol, {}, { validateResult: false });
+    const result = await yahooFinance.chart(symbol, {
+      period1: new Date(Date.now() - 7 * 24 * 3600 * 1000),
+      interval: '1d',
+    });
+    const closes = (result?.quotes || []).map((q) => q.close).filter(Boolean);
+    return closes.length > 0;
+  } catch (err) {
+    const msg = err.message || '';
+    if (
+      msg.includes('Not Found') ||
+      msg.includes('No data') ||
+      msg.includes('404') ||
+      err.type === 'invalid_symbol'
+    ) {
+      return false;
+    }
+    // Network/timeout hatası → geçerli say, analiz başlasın
     return true;
-  } catch {
-    return false;
   }
 }
 
