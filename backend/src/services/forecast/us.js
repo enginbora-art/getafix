@@ -1,5 +1,5 @@
 const yahooFinance = require('../../lib/yf');
-const { callAgent, summarizeForPeer } = require('./agents');
+const { callAgent, callAgentWithWebSearch, summarizeForPeer } = require('./agents');
 const { prefilterUs, getUsFilters } = require('./screener');
 const { sendForecastEmail } = require('../email');
 const prisma = require('../../lib/prisma');
@@ -271,16 +271,22 @@ async function runUsForecast(isClosing = false) {
   );
 
   console.log('[US] Ajanlar çalışıyor...');
-  const [agent1Out, agent2Out, agent3Out] = await Promise.all([
+  const [techV1, fundV1, sentV1] = await Promise.all([
     callAgent('US', 'technical', buildUsTechPrompt(stockBlock, todayStr), 2500),
     callAgent('US', 'fundamental', buildUsFundPrompt(stockBlock, todayStr), 2500),
-    callAgent('US', 'sentiment', buildUsSentPrompt(stockBlock, todayStr), 2500),
+    callAgentWithWebSearch('US', 'sentiment', buildUsSentPrompt(stockBlock, todayStr)),
+  ]);
+
+  console.log('[US] Tartışma turu...');
+  const [techV2, fundV2] = await Promise.all([
+    callAgent('US', 'technical', buildUsTechPrompt(stockBlock, todayStr) + `\n\nOTHER ANALYSTS' VIEWS:\n[Fundamental]\n${summarizeForPeer(fundV1)}\n\n[Sentiment]\n${summarizeForPeer(sentV1)}\n\nUpdate your assessment considering these views. Reinforce agreements, clarify disagreements with technical rationale.`, 2500),
+    callAgent('US', 'fundamental', buildUsFundPrompt(stockBlock, todayStr) + `\n\nOTHER ANALYSTS' VIEWS:\n[Technical]\n${summarizeForPeer(techV1)}\n\n[Sentiment]\n${summarizeForPeer(sentV1)}\n\nIf technical looks good but fundamentals are weak, say so clearly. And vice versa.`, 2500),
   ]);
 
   console.log('[US] Yönetici sentez yapıyor...');
-  const sum1 = summarizeForPeer(agent1Out, 1200);
-  const sum2 = summarizeForPeer(agent2Out, 1200);
-  const sum3 = summarizeForPeer(agent3Out, 1200);
+  const sum1 = summarizeForPeer(techV2, 1200);
+  const sum2 = summarizeForPeer(fundV2, 1200);
+  const sum3 = summarizeForPeer(sentV1, 1200);
 
   const managerPrompt = buildUsManagerPrompt(candidates, segmentContext, sum1, sum2, sum3, stockBlock, todayStr);
   const managerOut = await callAgent('US', 'manager', managerPrompt, 3000);
@@ -395,20 +401,26 @@ async function runManualAnalysis(ticker, onStep = null) {
   const stockBlock = compressForAgent(techFull, fundFull, spyReturns);
 
   await onStep?.('Ajan 1 — Teknik analiz yapılıyor...');
-  const agent1Out = await callAgent('US', 'technical', buildUsTechPrompt(stockBlock, todayStr), 2500);
+  const techV1 = await callAgent('US', 'technical', buildUsTechPrompt(stockBlock, todayStr), 2500);
 
   await onStep?.('Ajan 2 — Temel analiz yapılıyor...');
-  const agent2Out = await callAgent('US', 'fundamental', buildUsFundPrompt(stockBlock, todayStr), 2500);
+  const fundV1 = await callAgent('US', 'fundamental', buildUsFundPrompt(stockBlock, todayStr), 2500);
 
   await onStep?.('Ajan 3 — Haberler ve piyasa duygusu taranıyor...');
-  const agent3Out = await callAgent('US', 'sentiment', buildUsSentPrompt(stockBlock, todayStr), 2500);
+  const sentV1 = await callAgentWithWebSearch('US', 'sentiment', buildUsSentPrompt(stockBlock, todayStr));
+
+  await onStep?.('Tartışma turu — Ajanlar görüş alışverişi yapıyor...');
+  const [techV2, fundV2] = await Promise.all([
+    callAgent('US', 'technical', buildUsTechPrompt(stockBlock, todayStr) + `\n\nOTHER ANALYSTS' VIEWS:\n[Fundamental]\n${summarizeForPeer(fundV1)}\n\n[Sentiment]\n${summarizeForPeer(sentV1)}\n\nUpdate your assessment considering these views. Reinforce agreements, clarify disagreements with technical rationale.`, 2500),
+    callAgent('US', 'fundamental', buildUsFundPrompt(stockBlock, todayStr) + `\n\nOTHER ANALYSTS' VIEWS:\n[Technical]\n${summarizeForPeer(techV1)}\n\n[Sentiment]\n${summarizeForPeer(sentV1)}\n\nIf technical looks good but fundamentals are weak, say so clearly. And vice versa.`, 2500),
+  ]);
 
   await onStep?.('Yönetici sentez yapıyor...');
   const fund = fundFull[ticker] || {};
   const segmentContext = `${ticker}: ${fund.market_cap_segment || 'unknown'}cap, ${fund.sector || 'Unknown'} sector`;
-  const sum1 = summarizeForPeer(agent1Out, 1200);
-  const sum2 = summarizeForPeer(agent2Out, 1200);
-  const sum3 = summarizeForPeer(agent3Out, 1200);
+  const sum1 = summarizeForPeer(techV2, 1200);
+  const sum2 = summarizeForPeer(fundV2, 1200);
+  const sum3 = summarizeForPeer(sentV1, 1200);
   const result = await callAgent('US', 'manager', buildUsManagerPrompt([ticker], segmentContext, sum1, sum2, sum3, stockBlock, todayStr), 3000);
 
   return { result, currentPrice };
