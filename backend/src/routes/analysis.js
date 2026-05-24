@@ -129,7 +129,7 @@ async function processManualRequest(requestId) {
         : require('../services/forecast/us');
 
     const onStep = (step) => updateStep(requestId, step);
-    const { result, currentPrice } = await runManualAnalysis(req.ticker, onStep);
+    const { result, currentPrice } = await runManualAnalysis(req.ticker, onStep, { userId, requestId });
 
     await prisma.manualRequest.update({
       where: { id: requestId },

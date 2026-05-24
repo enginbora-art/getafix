@@ -17,6 +17,7 @@ model User {
   createdAt           DateTime @default(now())
   updatedAt DateTime @updatedAt
   requests  ManualRequest[]
+  apiUsageLogs ApiUsageLog[]
 }
 
 enum Role {
@@ -69,17 +70,34 @@ model FilterConfig {
 }
 
 model ManualRequest {
-  id           String        @id @default(cuid())
-  userId       String
-  user         User          @relation(fields: [userId], references: [id])
+  id                 String        @id @default(cuid())
+  userId             String
+  user               User          @relation(fields: [userId], references: [id])
+  market             Market
+  ticker             String
+  status             RequestStatus @default(PENDING)
+  result             String?       @db.Text
+  currentStep        String?
+  currentPrice       Float?
+  totalCostUsd       Float?
+  totalInputTokens   Int?
+  totalOutputTokens  Int?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+}
+
+model ApiUsageLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+  requestType  String
   market       Market
-  ticker       String
-  status       RequestStatus @default(PENDING)
-  result       String?       @db.Text
-  currentStep  String?
-  currentPrice Float?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  agentName    String
+  inputTokens  Int
+  outputTokens Int
+  costUsd      Float
+  ticker       String?
+  createdAt    DateTime @default(now())
 }
 
 enum RequestStatus {

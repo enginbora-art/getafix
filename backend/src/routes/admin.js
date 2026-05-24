@@ -146,6 +146,59 @@ router.put('/criteria/:market/:key', async (req, res) => {
   }
 });
 
+// GET /api/admin/costs
+router.get('/costs', async (req, res) => {
+  try {
+    const [totals, byMarket, byUser, byDay] = await Promise.all([
+      prisma.apiUsageLog.aggregate({
+        _sum: { costUsd: true, inputTokens: true, outputTokens: true },
+        _count: { id: true },
+      }),
+      prisma.apiUsageLog.groupBy({
+        by: ['market'],
+        _sum: { costUsd: true, inputTokens: true, outputTokens: true },
+        _count: { id: true },
+      }),
+      prisma.$queryRaw`
+        SELECT u.id, u.email, u.name,
+               COALESCE(SUM(a."costUsd"), 0)::float AS "totalCostUsd",
+               COALESCE(SUM(a."inputTokens"), 0)::int AS "totalInputTokens",
+               COALESCE(SUM(a."outputTokens"), 0)::int AS "totalOutputTokens",
+               COUNT(a.id)::int AS "callCount"
+        FROM "User" u
+        LEFT JOIN "ApiUsageLog" a ON a."userId" = u.id
+        GROUP BY u.id, u.email, u.name
+        ORDER BY "totalCostUsd" DESC
+      `,
+      prisma.$queryRaw`
+        SELECT DATE("createdAt") AS day,
+               market,
+               COALESCE(SUM("costUsd"), 0)::float AS "costUsd",
+               COALESCE(SUM("inputTokens"), 0)::int AS "inputTokens",
+               COALESCE(SUM("outputTokens"), 0)::int AS "outputTokens"
+        FROM "ApiUsageLog"
+        WHERE "createdAt" >= NOW() - INTERVAL '30 days'
+        GROUP BY day, market
+        ORDER BY day ASC
+      `,
+    ]);
+
+    res.json({
+      totals: {
+        costUsd: totals._sum.costUsd || 0,
+        inputTokens: totals._sum.inputTokens || 0,
+        outputTokens: totals._sum.outputTokens || 0,
+        callCount: totals._count.id || 0,
+      },
+      byMarket,
+      byUser,
+      byDay,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/admin/forecast/run
 router.post('/forecast/run', async (req, res) => {
   try {

@@ -102,7 +102,12 @@ async function callAgent(market, agentName, userMessage, maxTokens = 1500) {
         system,
         messages: [{ role: 'user', content: userMessage }],
       });
-      return msg.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
+      const text = msg.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
+      return {
+        text,
+        inputTokens: msg.usage?.input_tokens || 0,
+        outputTokens: msg.usage?.output_tokens || 0,
+      };
     } catch (err) {
       const status = err.status || 0;
       if (attempt < 3 && (status === 429 || status === 529)) {
@@ -125,7 +130,12 @@ async function callAgentWithWebSearch(market, agentName, userMessage) {
     messages: [{ role: 'user', content: userMessage }],
     tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
   });
-  return msg.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
+  const text = msg.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
+  return {
+    text,
+    inputTokens: msg.usage?.input_tokens || 0,
+    outputTokens: msg.usage?.output_tokens || 0,
+  };
 }
 
 function summarizeForPeer(text, maxChars = 1200) {

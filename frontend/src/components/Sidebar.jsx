@@ -1,6 +1,6 @@
 import React from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, FileText, Search, Users, Bot, SlidersHorizontal, LogOut, TrendingUp } from 'lucide-react'
+import { LayoutDashboard, FileText, Search, Users, Bot, SlidersHorizontal, DollarSign, LogOut, TrendingUp } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const navItem = (to, Icon, label) => (
@@ -48,6 +48,7 @@ export default function Sidebar() {
             {navItem('/admin/users', Users, 'Kullanıcılar')}
             {navItem('/admin/agents', Bot, 'Ajan Yapılandırması')}
             {navItem('/admin/criteria', SlidersHorizontal, 'Kriter Düzenleyici')}
+            {navItem('/admin/costs', DollarSign, 'Maliyet Takibi')}
           </>
         )}
       </nav>

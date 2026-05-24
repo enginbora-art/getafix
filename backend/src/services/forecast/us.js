@@ -3,6 +3,7 @@ const { callAgent, callAgentWithWebSearch, summarizeForPeer } = require('./agent
 const { prefilterUs, getUsFilters } = require('./screener');
 const { sendForecastEmail } = require('../email');
 const prisma = require('../../lib/prisma');
+const { logUsage, calculateCost } = require('../../lib/costTracker');
 
 // S&P 500 Core + S&P 400 Mid Cap + Russell Liquid — sp500_russell.txt ile senkronize
 const US_WATCHLIST = [
@@ -271,26 +272,37 @@ async function runUsForecast(isClosing = false) {
   );
 
   console.log('[US] Ajanlar çalışıyor...');
-  const [techV1, fundV1, sentV1] = await Promise.all([
+  const [r1tech, r1fund, r1sent] = await Promise.all([
     callAgent('US', 'technical', buildUsTechPrompt(stockBlock, todayStr), 2500),
     callAgent('US', 'fundamental', buildUsFundPrompt(stockBlock, todayStr), 2500),
     callAgentWithWebSearch('US', 'sentiment', buildUsSentPrompt(stockBlock, todayStr)),
   ]);
+  await Promise.all([
+    logUsage({ requestType: 'scheduled', market: 'US', agentName: 'technical', inputTokens: r1tech.inputTokens, outputTokens: r1tech.outputTokens }),
+    logUsage({ requestType: 'scheduled', market: 'US', agentName: 'fundamental', inputTokens: r1fund.inputTokens, outputTokens: r1fund.outputTokens }),
+    logUsage({ requestType: 'scheduled', market: 'US', agentName: 'sentiment', inputTokens: r1sent.inputTokens, outputTokens: r1sent.outputTokens }),
+  ]);
 
   console.log('[US] Tartışma turu...');
-  const [techV2, fundV2] = await Promise.all([
-    callAgent('US', 'technical', buildUsTechPrompt(stockBlock, todayStr) + `\n\nOTHER ANALYSTS' VIEWS:\n[Fundamental]\n${summarizeForPeer(fundV1)}\n\n[Sentiment]\n${summarizeForPeer(sentV1)}\n\nUpdate your assessment considering these views. Reinforce agreements, clarify disagreements with technical rationale.`, 2500),
-    callAgent('US', 'fundamental', buildUsFundPrompt(stockBlock, todayStr) + `\n\nOTHER ANALYSTS' VIEWS:\n[Technical]\n${summarizeForPeer(techV1)}\n\n[Sentiment]\n${summarizeForPeer(sentV1)}\n\nIf technical looks good but fundamentals are weak, say so clearly. And vice versa.`, 2500),
+  const [r2tech, r2fund] = await Promise.all([
+    callAgent('US', 'technical', buildUsTechPrompt(stockBlock, todayStr) + `\n\nOTHER ANALYSTS' VIEWS:\n[Fundamental]\n${summarizeForPeer(r1fund.text)}\n\n[Sentiment]\n${summarizeForPeer(r1sent.text)}\n\nUpdate your assessment considering these views. Reinforce agreements, clarify disagreements with technical rationale.`, 2500),
+    callAgent('US', 'fundamental', buildUsFundPrompt(stockBlock, todayStr) + `\n\nOTHER ANALYSTS' VIEWS:\n[Technical]\n${summarizeForPeer(r1tech.text)}\n\n[Sentiment]\n${summarizeForPeer(r1sent.text)}\n\nIf technical looks good but fundamentals are weak, say so clearly. And vice versa.`, 2500),
+  ]);
+  await Promise.all([
+    logUsage({ requestType: 'scheduled', market: 'US', agentName: 'technical_peer', inputTokens: r2tech.inputTokens, outputTokens: r2tech.outputTokens }),
+    logUsage({ requestType: 'scheduled', market: 'US', agentName: 'fundamental_peer', inputTokens: r2fund.inputTokens, outputTokens: r2fund.outputTokens }),
   ]);
 
   console.log('[US] Yönetici sentez yapıyor...');
-  const sum1 = summarizeForPeer(techV2, 1200);
-  const sum2 = summarizeForPeer(fundV2, 1200);
-  const sum3 = summarizeForPeer(sentV1, 1200);
+  const sum1 = summarizeForPeer(r2tech.text, 1200);
+  const sum2 = summarizeForPeer(r2fund.text, 1200);
+  const sum3 = summarizeForPeer(r1sent.text, 1200);
 
   const managerPrompt = buildUsManagerPrompt(candidates, segmentContext, sum1, sum2, sum3, stockBlock, todayStr);
-  const managerOut = await callAgent('US', 'manager', managerPrompt, 3000);
+  const rManager = await callAgent('US', 'manager', managerPrompt, 3000);
+  await logUsage({ requestType: 'scheduled', market: 'US', agentName: 'manager', inputTokens: rManager.inputTokens, outputTokens: rManager.outputTokens });
 
+  const managerOut = rManager.text;
   const rec = parseForecastJson(managerOut);
 
   const report = await prisma.report.create({
@@ -389,8 +401,11 @@ Raporun TAMAMEN SONUNA şu JSON bloğunu ekle (kullanıcıya gösterilmeyecek):
 \`\`\``;
 }
 
-async function runManualAnalysis(ticker, onStep = null) {
+async function runManualAnalysis(ticker, onStep = null, context = {}) {
+  const { userId, requestId } = context;
   const todayStr = new Date().toISOString().split('T')[0];
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
 
   await onStep?.('Veri çekiliyor...');
   const spyReturns = await fetchSpyReturns();
@@ -401,29 +416,54 @@ async function runManualAnalysis(ticker, onStep = null) {
   const stockBlock = compressForAgent(techFull, fundFull, spyReturns);
 
   await onStep?.('Ajan 1 — Teknik analiz yapılıyor...');
-  const techV1 = await callAgent('US', 'technical', buildUsTechPrompt(stockBlock, todayStr), 2500);
+  const r1tech = await callAgent('US', 'technical', buildUsTechPrompt(stockBlock, todayStr), 2500);
+  totalInputTokens += r1tech.inputTokens; totalOutputTokens += r1tech.outputTokens;
+  await logUsage({ userId, requestType: 'manual', market: 'US', agentName: 'technical', inputTokens: r1tech.inputTokens, outputTokens: r1tech.outputTokens, ticker });
 
   await onStep?.('Ajan 2 — Temel analiz yapılıyor...');
-  const fundV1 = await callAgent('US', 'fundamental', buildUsFundPrompt(stockBlock, todayStr), 2500);
+  const r1fund = await callAgent('US', 'fundamental', buildUsFundPrompt(stockBlock, todayStr), 2500);
+  totalInputTokens += r1fund.inputTokens; totalOutputTokens += r1fund.outputTokens;
+  await logUsage({ userId, requestType: 'manual', market: 'US', agentName: 'fundamental', inputTokens: r1fund.inputTokens, outputTokens: r1fund.outputTokens, ticker });
 
   await onStep?.('Ajan 3 — Haberler ve piyasa duygusu taranıyor...');
-  const sentV1 = await callAgentWithWebSearch('US', 'sentiment', buildUsSentPrompt(stockBlock, todayStr));
+  const r1sent = await callAgentWithWebSearch('US', 'sentiment', buildUsSentPrompt(stockBlock, todayStr));
+  totalInputTokens += r1sent.inputTokens; totalOutputTokens += r1sent.outputTokens;
+  await logUsage({ userId, requestType: 'manual', market: 'US', agentName: 'sentiment', inputTokens: r1sent.inputTokens, outputTokens: r1sent.outputTokens, ticker });
 
   await onStep?.('Tartışma turu — Ajanlar görüş alışverişi yapıyor...');
-  const [techV2, fundV2] = await Promise.all([
-    callAgent('US', 'technical', buildUsTechPrompt(stockBlock, todayStr) + `\n\nOTHER ANALYSTS' VIEWS:\n[Fundamental]\n${summarizeForPeer(fundV1)}\n\n[Sentiment]\n${summarizeForPeer(sentV1)}\n\nUpdate your assessment considering these views. Reinforce agreements, clarify disagreements with technical rationale.`, 2500),
-    callAgent('US', 'fundamental', buildUsFundPrompt(stockBlock, todayStr) + `\n\nOTHER ANALYSTS' VIEWS:\n[Technical]\n${summarizeForPeer(techV1)}\n\n[Sentiment]\n${summarizeForPeer(sentV1)}\n\nIf technical looks good but fundamentals are weak, say so clearly. And vice versa.`, 2500),
+  const [r2tech, r2fund] = await Promise.all([
+    callAgent('US', 'technical', buildUsTechPrompt(stockBlock, todayStr) + `\n\nOTHER ANALYSTS' VIEWS:\n[Fundamental]\n${summarizeForPeer(r1fund.text)}\n\n[Sentiment]\n${summarizeForPeer(r1sent.text)}\n\nUpdate your assessment considering these views. Reinforce agreements, clarify disagreements with technical rationale.`, 2500),
+    callAgent('US', 'fundamental', buildUsFundPrompt(stockBlock, todayStr) + `\n\nOTHER ANALYSTS' VIEWS:\n[Technical]\n${summarizeForPeer(r1tech.text)}\n\n[Sentiment]\n${summarizeForPeer(r1sent.text)}\n\nIf technical looks good but fundamentals are weak, say so clearly. And vice versa.`, 2500),
+  ]);
+  totalInputTokens += r2tech.inputTokens + r2fund.inputTokens;
+  totalOutputTokens += r2tech.outputTokens + r2fund.outputTokens;
+  await Promise.all([
+    logUsage({ userId, requestType: 'manual', market: 'US', agentName: 'technical_peer', inputTokens: r2tech.inputTokens, outputTokens: r2tech.outputTokens, ticker }),
+    logUsage({ userId, requestType: 'manual', market: 'US', agentName: 'fundamental_peer', inputTokens: r2fund.inputTokens, outputTokens: r2fund.outputTokens, ticker }),
   ]);
 
   await onStep?.('Yönetici sentez yapıyor...');
   const fund = fundFull[ticker] || {};
   const segmentContext = `${ticker}: ${fund.market_cap_segment || 'unknown'}cap, ${fund.sector || 'Unknown'} sector`;
-  const sum1 = summarizeForPeer(techV2, 1200);
-  const sum2 = summarizeForPeer(fundV2, 1200);
-  const sum3 = summarizeForPeer(sentV1, 1200);
-  const result = await callAgent('US', 'manager', buildUsManagerPrompt([ticker], segmentContext, sum1, sum2, sum3, stockBlock, todayStr), 3000);
+  const sum1 = summarizeForPeer(r2tech.text, 1200);
+  const sum2 = summarizeForPeer(r2fund.text, 1200);
+  const sum3 = summarizeForPeer(r1sent.text, 1200);
+  const rManager = await callAgent('US', 'manager', buildUsManagerPrompt([ticker], segmentContext, sum1, sum2, sum3, stockBlock, todayStr), 3000);
+  totalInputTokens += rManager.inputTokens; totalOutputTokens += rManager.outputTokens;
+  await logUsage({ userId, requestType: 'manual', market: 'US', agentName: 'manager', inputTokens: rManager.inputTokens, outputTokens: rManager.outputTokens, ticker });
 
-  return { result, currentPrice };
+  if (requestId) {
+    await prisma.manualRequest.update({
+      where: { id: requestId },
+      data: {
+        totalInputTokens,
+        totalOutputTokens,
+        totalCostUsd: calculateCost(totalInputTokens, totalOutputTokens),
+      },
+    }).catch((err) => console.error('[COST] ManualRequest güncellenemedi:', err.message));
+  }
+
+  return { result: rManager.text, currentPrice };
 }
 
 module.exports = { runUsForecast, runManualAnalysis };

@@ -3,6 +3,7 @@ const { callAgent, callAgentWithWebSearch, summarizeForPeer } = require('./agent
 const { prefilterBist, getBistFilters } = require('./screener');
 const { sendForecastEmail, sendErrorEmail } = require('../email');
 const prisma = require('../../lib/prisma');
+const { logUsage, calculateCost } = require('../../lib/costTracker');
 
 // BIST 100 — bist100.txt ile senkronize (97 hisse)
 const BIST_WATCHLIST = [
@@ -207,22 +208,33 @@ async function runBistForecast(isClosing = false) {
   const sentPrompt = buildSentPrompt(bistCodes, dateStr);
 
   console.log('[BIST] Ajanlar çalışıyor...');
-  const [techV1, fundV1, sentV1] = await Promise.all([
+  const [r1tech, r1fund, r1sent] = await Promise.all([
     callAgent('BIST', 'technical', techPrompt),
     callAgent('BIST', 'fundamental', fundPrompt),
     callAgentWithWebSearch('BIST', 'sentiment', sentPrompt),
   ]);
-
-  console.log('[BIST] Tartışma turu...');
-  const [techV2, fundV2] = await Promise.all([
-    callAgent('BIST', 'technical', techPrompt + `\n\nDİĞER AJANLARIN GÖRÜŞLERİ:\n[Temel analist özeti]\n${summarizeForPeer(fundV1)}\n\n[Sentiment özeti]\n${summarizeForPeer(sentV1)}\n\nBu görüşleri okuyup değerlendirmeni güncelle. Çelişkili noktalarda teknik gerekçeni daha net koy, ortak görüşte pekiştir.`),
-    callAgent('BIST', 'fundamental', fundPrompt + `\n\nDİĞER AJANLARIN GÖRÜŞLERİ:\n[Teknik analist özeti]\n${summarizeForPeer(techV1)}\n\n[Sentiment özeti]\n${summarizeForPeer(sentV1)}\n\nTeknik tablo iyi ama temelde zayıf bir kağıt varsa açıkça belirt. Tersi de geçerli.`),
+  await Promise.all([
+    logUsage({ requestType: 'scheduled', market: 'BIST', agentName: 'technical', inputTokens: r1tech.inputTokens, outputTokens: r1tech.outputTokens }),
+    logUsage({ requestType: 'scheduled', market: 'BIST', agentName: 'fundamental', inputTokens: r1fund.inputTokens, outputTokens: r1fund.outputTokens }),
+    logUsage({ requestType: 'scheduled', market: 'BIST', agentName: 'sentiment', inputTokens: r1sent.inputTokens, outputTokens: r1sent.outputTokens }),
   ]);
 
-  const managerPrompt = buildManagerPrompt(techV2, fundV2, sentV1, dateStr, bistCodes);
-  console.log('[BIST] Yönetici sentez yapıyor...');
-  const finalReport = await callAgent('BIST', 'manager', managerPrompt, 3000);
+  console.log('[BIST] Tartışma turu...');
+  const [r2tech, r2fund] = await Promise.all([
+    callAgent('BIST', 'technical', techPrompt + `\n\nDİĞER AJANLARIN GÖRÜŞLERİ:\n[Temel analist özeti]\n${summarizeForPeer(r1fund.text)}\n\n[Sentiment özeti]\n${summarizeForPeer(r1sent.text)}\n\nBu görüşleri okuyup değerlendirmeni güncelle. Çelişkili noktalarda teknik gerekçeni daha net koy, ortak görüşte pekiştir.`),
+    callAgent('BIST', 'fundamental', fundPrompt + `\n\nDİĞER AJANLARIN GÖRÜŞLERİ:\n[Teknik analist özeti]\n${summarizeForPeer(r1tech.text)}\n\n[Sentiment özeti]\n${summarizeForPeer(r1sent.text)}\n\nTeknik tablo iyi ama temelde zayıf bir kağıt varsa açıkça belirt. Tersi de geçerli.`),
+  ]);
+  await Promise.all([
+    logUsage({ requestType: 'scheduled', market: 'BIST', agentName: 'technical_peer', inputTokens: r2tech.inputTokens, outputTokens: r2tech.outputTokens }),
+    logUsage({ requestType: 'scheduled', market: 'BIST', agentName: 'fundamental_peer', inputTokens: r2fund.inputTokens, outputTokens: r2fund.outputTokens }),
+  ]);
 
+  const managerPrompt = buildManagerPrompt(r2tech.text, r2fund.text, r1sent.text, dateStr, bistCodes);
+  console.log('[BIST] Yönetici sentez yapıyor...');
+  const rManager = await callAgent('BIST', 'manager', managerPrompt, 3000);
+  await logUsage({ requestType: 'scheduled', market: 'BIST', agentName: 'manager', inputTokens: rManager.inputTokens, outputTokens: rManager.outputTokens });
+
+  const finalReport = rManager.text;
   const rec = parseForecastJson(finalReport);
 
   const report = await prisma.report.create({
@@ -318,9 +330,12 @@ Raporun TAMAMEN SONUNA (raporun dışına) şu JSON bloğunu ekle — bu blok ku
 \`\`\``;
 }
 
-async function runManualAnalysis(ticker, onStep = null) {
+async function runManualAnalysis(ticker, onStep = null, context = {}) {
+  const { userId, requestId } = context;
   const tickerYf = `${ticker}.IS`;
   const dateStr = new Date().toLocaleDateString('tr-TR');
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
 
   await onStep?.('Veri çekiliyor...');
   const techFull = await fetchTechnicalSnapshot([tickerYf]);
@@ -330,24 +345,49 @@ async function runManualAnalysis(ticker, onStep = null) {
   const compressed = compressForAgent(techFull, fundFull);
 
   await onStep?.('Ajan 1 — Teknik analiz yapılıyor...');
-  const techV1 = await callAgent('BIST', 'technical', buildTechPrompt(compressed, dateStr));
+  const r1tech = await callAgent('BIST', 'technical', buildTechPrompt(compressed, dateStr));
+  totalInputTokens += r1tech.inputTokens; totalOutputTokens += r1tech.outputTokens;
+  await logUsage({ userId, requestType: 'manual', market: 'BIST', agentName: 'technical', inputTokens: r1tech.inputTokens, outputTokens: r1tech.outputTokens, ticker });
 
   await onStep?.('Ajan 2 — Temel analiz yapılıyor...');
-  const fundV1 = await callAgent('BIST', 'fundamental', buildFundPrompt(compressed, dateStr));
+  const r1fund = await callAgent('BIST', 'fundamental', buildFundPrompt(compressed, dateStr));
+  totalInputTokens += r1fund.inputTokens; totalOutputTokens += r1fund.outputTokens;
+  await logUsage({ userId, requestType: 'manual', market: 'BIST', agentName: 'fundamental', inputTokens: r1fund.inputTokens, outputTokens: r1fund.outputTokens, ticker });
 
   await onStep?.('Ajan 3 — Haberler ve piyasa duygusu taranıyor...');
-  const sentV1 = await callAgentWithWebSearch('BIST', 'sentiment', buildSentPrompt([ticker], dateStr));
+  const r1sent = await callAgentWithWebSearch('BIST', 'sentiment', buildSentPrompt([ticker], dateStr));
+  totalInputTokens += r1sent.inputTokens; totalOutputTokens += r1sent.outputTokens;
+  await logUsage({ userId, requestType: 'manual', market: 'BIST', agentName: 'sentiment', inputTokens: r1sent.inputTokens, outputTokens: r1sent.outputTokens, ticker });
 
   await onStep?.('Tartışma turu — Ajanlar görüş alışverişi yapıyor...');
-  const [techV2, fundV2] = await Promise.all([
-    callAgent('BIST', 'technical', buildTechPrompt(compressed, dateStr) + `\n\nDİĞER AJANLARIN GÖRÜŞLERİ:\n[Temel analist özeti]\n${summarizeForPeer(fundV1)}\n\n[Sentiment özeti]\n${summarizeForPeer(sentV1)}\n\nBu görüşleri okuyup değerlendirmeni güncelle. Çelişkili noktalarda teknik gerekçeni daha net koy, ortak görüşte pekiştir.`),
-    callAgent('BIST', 'fundamental', buildFundPrompt(compressed, dateStr) + `\n\nDİĞER AJANLARIN GÖRÜŞLERİ:\n[Teknik analist özeti]\n${summarizeForPeer(techV1)}\n\n[Sentiment özeti]\n${summarizeForPeer(sentV1)}\n\nTeknik tablo iyi ama temelde zayıf bir kağıt varsa açıkça belirt. Tersi de geçerli.`),
+  const [r2tech, r2fund] = await Promise.all([
+    callAgent('BIST', 'technical', buildTechPrompt(compressed, dateStr) + `\n\nDİĞER AJANLARIN GÖRÜŞLERİ:\n[Temel analist özeti]\n${summarizeForPeer(r1fund.text)}\n\n[Sentiment özeti]\n${summarizeForPeer(r1sent.text)}\n\nBu görüşleri okuyup değerlendirmeni güncelle. Çelişkili noktalarda teknik gerekçeni daha net koy, ortak görüşte pekiştir.`),
+    callAgent('BIST', 'fundamental', buildFundPrompt(compressed, dateStr) + `\n\nDİĞER AJANLARIN GÖRÜŞLERİ:\n[Teknik analist özeti]\n${summarizeForPeer(r1tech.text)}\n\n[Sentiment özeti]\n${summarizeForPeer(r1sent.text)}\n\nTeknik tablo iyi ama temelde zayıf bir kağıt varsa açıkça belirt. Tersi de geçerli.`),
+  ]);
+  totalInputTokens += r2tech.inputTokens + r2fund.inputTokens;
+  totalOutputTokens += r2tech.outputTokens + r2fund.outputTokens;
+  await Promise.all([
+    logUsage({ userId, requestType: 'manual', market: 'BIST', agentName: 'technical_peer', inputTokens: r2tech.inputTokens, outputTokens: r2tech.outputTokens, ticker }),
+    logUsage({ userId, requestType: 'manual', market: 'BIST', agentName: 'fundamental_peer', inputTokens: r2fund.inputTokens, outputTokens: r2fund.outputTokens, ticker }),
   ]);
 
   await onStep?.('Yönetici sentez yapıyor...');
-  const result = await callAgent('BIST', 'manager', buildManagerPrompt(techV2, fundV2, sentV1, dateStr, [ticker]), 3000);
+  const rManager = await callAgent('BIST', 'manager', buildManagerPrompt(r2tech.text, r2fund.text, r1sent.text, dateStr, [ticker]), 3000);
+  totalInputTokens += rManager.inputTokens; totalOutputTokens += rManager.outputTokens;
+  await logUsage({ userId, requestType: 'manual', market: 'BIST', agentName: 'manager', inputTokens: rManager.inputTokens, outputTokens: rManager.outputTokens, ticker });
 
-  return { result, currentPrice };
+  if (requestId) {
+    await prisma.manualRequest.update({
+      where: { id: requestId },
+      data: {
+        totalInputTokens,
+        totalOutputTokens,
+        totalCostUsd: calculateCost(totalInputTokens, totalOutputTokens),
+      },
+    }).catch((err) => console.error('[COST] ManualRequest güncellenemedi:', err.message));
+  }
+
+  return { result: rManager.text, currentPrice };
 }
 
 module.exports = { runBistForecast, runManualAnalysis };

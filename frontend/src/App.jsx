@@ -11,6 +11,7 @@ import ChangePassword from './pages/ChangePassword'
 import AdminUsers from './pages/admin/Users'
 import AdminAgents from './pages/admin/Agents'
 import AdminCriteria from './pages/admin/Criteria'
+import AdminCosts from './pages/admin/Costs'
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
             <Route path="/admin/users" element={<ProtectedRoute adminOnly><AdminUsers /></ProtectedRoute>} />
             <Route path="/admin/agents" element={<ProtectedRoute adminOnly><AdminAgents /></ProtectedRoute>} />
             <Route path="/admin/criteria" element={<ProtectedRoute adminOnly><AdminCriteria /></ProtectedRoute>} />
+            <Route path="/admin/costs" element={<ProtectedRoute adminOnly><AdminCosts /></ProtectedRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
