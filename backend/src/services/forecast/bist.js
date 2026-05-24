@@ -38,33 +38,46 @@ function computeRsi(prices, period = 14) {
   return Math.round((100 - 100 / (1 + rs)) * 10) / 10;
 }
 
+async function batchedFetch(items, fetchFn, batchSize = 10) {
+  const results = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.allSettled(batch.map(fetchFn));
+    results.push(...batchResults);
+    if (i + batchSize < items.length) {
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+  return results;
+}
+
 async function fetchTechnicalSnapshot(tickers) {
-  const snapshot = {};
-  for (const ticker of tickers) {
-    try {
-      const result = await yahooFinance.chart(ticker, {
-        period1: new Date(Date.now() - 180 * 24 * 3600 * 1000),
-        interval: '1d',
-      });
-      const quotes = result.quotes || [];
-      if (quotes.length < 50) continue;
+  const results = await batchedFetch(tickers, async (ticker) => {
+    const result = await yahooFinance.chart(ticker, {
+      period1: new Date(Date.now() - 180 * 24 * 3600 * 1000),
+      interval: '1d',
+    });
+    const quotes = result.quotes || [];
+    if (quotes.length < 50) return null;
 
-      const closes = quotes.map((q) => q.close).filter(Boolean);
-      const volumes = quotes.map((q) => q.volume).filter(Boolean);
+    const closes = quotes.map((q) => q.close).filter(Boolean);
+    const volumes = quotes.map((q) => q.volume).filter(Boolean);
 
-      const sma = (arr, n) => {
-        const slice = arr.slice(-n);
-        return slice.length === n ? slice.reduce((a, b) => a + b, 0) / n : null;
-      };
+    const sma = (arr, n) => {
+      const slice = arr.slice(-n);
+      return slice.length === n ? slice.reduce((a, b) => a + b, 0) / n : null;
+    };
 
-      const close = closes[closes.length - 1];
-      const sma20 = sma(closes, 20);
-      const sma50 = sma(closes, 50);
-      const rsi14 = computeRsi(closes);
-      const vol5 = volumes.slice(-5).reduce((a, b) => a + b, 0) / 5;
-      const vol20 = volumes.slice(-20).reduce((a, b) => a + b, 0) / 20;
+    const close = closes[closes.length - 1];
+    const sma20 = sma(closes, 20);
+    const sma50 = sma(closes, 50);
+    const rsi14 = computeRsi(closes);
+    const vol5 = volumes.slice(-5).reduce((a, b) => a + b, 0) / 5;
+    const vol20 = volumes.slice(-20).reduce((a, b) => a + b, 0) / 20;
 
-      snapshot[ticker] = {
+    return {
+      ticker,
+      data: {
         price: Math.round(close * 100) / 100,
         sma20: sma20 ? Math.round(sma20 * 100) / 100 : null,
         sma50: sma50 ? Math.round(sma50 * 100) / 100 : null,
@@ -75,27 +88,32 @@ async function fetchTechnicalSnapshot(tickers) {
         vs_sma50_pct: sma50 ? Math.round(((close / sma50 - 1) * 100) * 100) / 100 : null,
         avg_volume_20d: Math.round(vol20),
         volume_trend: vol5 > vol20 * 1.1 ? 'artan' : vol5 < vol20 * 0.9 ? 'azalan' : 'yatay',
-      };
-    } catch {
-      // skip
+      },
+    };
+  });
+
+  const snapshot = {};
+  for (const r of results) {
+    if (r.status === 'fulfilled' && r.value) {
+      snapshot[r.value.ticker] = r.value.data;
     }
   }
   return snapshot;
 }
 
 async function fetchFundamentalSnapshot(tickers) {
-  const snapshot = {};
-  for (const ticker of tickers) {
-    try {
-      const info = await yahooFinance.quoteSummary(ticker, {
-        modules: ['summaryDetail', 'defaultKeyStatistics', 'financialData', 'assetProfile'],
-      });
-      const sd = info.summaryDetail || {};
-      const ks = info.defaultKeyStatistics || {};
-      const fd = info.financialData || {};
-      const ap = info.assetProfile || {};
+  const results = await batchedFetch(tickers, async (ticker) => {
+    const info = await yahooFinance.quoteSummary(ticker, {
+      modules: ['summaryDetail', 'defaultKeyStatistics', 'financialData', 'assetProfile'],
+    });
+    const sd = info.summaryDetail || {};
+    const ks = info.defaultKeyStatistics || {};
+    const fd = info.financialData || {};
+    const ap = info.assetProfile || {};
 
-      snapshot[ticker] = {
+    return {
+      ticker,
+      data: {
         sector: ap.sector || null,
         market_cap_try: sd.marketCap || null,
         pe_trailing: sd.trailingPE || null,
@@ -107,9 +125,14 @@ async function fetchFundamentalSnapshot(tickers) {
         earnings_growth_pct: fd.earningsGrowth ? fd.earningsGrowth * 100 : null,
         debt_to_equity: fd.debtToEquity || null,
         roe_pct: fd.returnOnEquity ? fd.returnOnEquity * 100 : null,
-      };
-    } catch {
-      // skip
+      },
+    };
+  });
+
+  const snapshot = {};
+  for (const r of results) {
+    if (r.status === 'fulfilled' && r.value) {
+      snapshot[r.value.ticker] = r.value.data;
     }
   }
   return snapshot;
