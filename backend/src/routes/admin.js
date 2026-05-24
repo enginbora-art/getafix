@@ -8,6 +8,9 @@ const { sendWelcomeEmail } = require('../services/email');
 
 const router = express.Router();
 
+const VALID_ROLES = ['ADMIN', 'USER'];
+const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email));
+
 router.use(authMiddleware, requireAdmin);
 
 // GET /api/admin/users
@@ -27,9 +30,9 @@ router.get('/users', async (req, res) => {
 router.post('/users', async (req, res) => {
   try {
     const { email, name, role = 'USER' } = req.body;
-    if (!email || !name) {
-      return res.status(400).json({ error: 'Email ve isim zorunlu' });
-    }
+    if (!email || !name) return res.status(400).json({ error: 'Email ve isim zorunlu' });
+    if (!isValidEmail(email)) return res.status(400).json({ error: 'Geçerli bir email adresi girin.' });
+    if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: 'Geçersiz rol.' });
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(409).json({ error: 'Bu email zaten kayıtlı' });
 
@@ -54,8 +57,11 @@ router.post('/users', async (req, res) => {
 router.patch('/users/:id', async (req, res) => {
   try {
     const { isActive, role } = req.body;
+    if (role !== undefined && !VALID_ROLES.includes(role)) {
+      return res.status(400).json({ error: 'Geçersiz rol.' });
+    }
     const data = {};
-    if (isActive !== undefined) data.isActive = isActive;
+    if (isActive !== undefined) data.isActive = Boolean(isActive);
     if (role !== undefined) data.role = role;
 
     const user = await prisma.user.update({

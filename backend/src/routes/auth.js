@@ -10,33 +10,15 @@ function signToken(userId) {
   return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
 }
 
-// POST /api/auth/register
-router.post('/register', async (req, res) => {
-  try {
-    const { email, name, password } = req.body;
-    if (!email || !name || !password) {
-      return res.status(400).json({ error: 'Email, isim ve şifre zorunlu' });
-    }
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      return res.status(409).json({ error: 'Bu email zaten kayıtlı' });
-    }
-    const hashed = await bcrypt.hash(password, 12);
-    const user = await prisma.user.create({
-      data: { email, name, password: hashed },
-      select: { id: true, email: true, name: true, role: true },
-    });
-    const token = signToken(user.id);
-    res.status(201).json({ token, user });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email));
 
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    if (!email || !password || !isValidEmail(email)) {
+      return res.status(400).json({ error: 'Geçerli bir email ve şifre girin.' });
+    }
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user || !user.isActive) {
       return res.status(401).json({ error: 'Email veya şifre hatalı' });

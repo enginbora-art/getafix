@@ -55,6 +55,16 @@ router.post('/request', authMiddleware, async (req, res) => {
     if (!['BIST', 'US'].includes(market)) return res.status(400).json({ error: 'Geçersiz market' });
 
     const tickerUpper = ticker.trim().toUpperCase();
+    if (tickerUpper.length === 0 || tickerUpper.length > 20) {
+      return res.status(400).json({ error: 'Geçersiz hisse kodu.' });
+    }
+
+    const activeCount = await prisma.manualRequest.count({
+      where: { userId: req.user.id, status: { in: ['PENDING', 'QUEUED', 'PROCESSING'] } },
+    });
+    if (activeCount >= 3) {
+      return res.status(429).json({ error: 'Maksimum 3 aktif analiz isteğiniz olabilir. Mevcut analizler tamamlanınca tekrar deneyin.' });
+    }
 
     const valid = await validateTicker(market, tickerUpper);
     if (!valid) {
