@@ -7,6 +7,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Reports from './pages/Reports'
 import Analysis from './pages/Analysis'
+import ChangePassword from './pages/ChangePassword'
 import AdminUsers from './pages/admin/Users'
 import AdminAgents from './pages/admin/Agents'
 import AdminCriteria from './pages/admin/Criteria'
@@ -17,6 +18,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />

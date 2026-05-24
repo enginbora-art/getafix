@@ -76,20 +76,28 @@ async function sendForecastEmail(markdownReport, market, date) {
 }
 
 async function sendWelcomeEmail({ to, name, tempPassword }) {
+  const loginUrl = `${process.env.FRONTEND_URL || 'https://getafix.com.tr'}/login`;
   const markdownBody = `# Getafix'e Hoş Geldiniz, ${name}!
 
-Hesabınız oluşturuldu. Giriş bilgileriniz:
+Hesabınız oluşturuldu ve kullanıma hazır.
+
+## Giriş Bilgileriniz
 
 | | |
 |---|---|
 | **E-posta** | ${to} |
-| **Geçici şifre** | ${tempPassword} |
+| **Geçici Şifre** | \`${tempPassword}\` |
 
-İlk girişte şifrenizi değiştirmenizi öneririz.
+## Sonraki Adım
 
-[Giriş Yap](${process.env.FRONTEND_URL}/login)
+[Giriş Yap → ${loginUrl}](${loginUrl})
+
+Giriş yaptıktan sonra sistem sizi otomatik olarak şifre değiştirme sayfasına yönlendirecektir. Yeni şifreniz en az 8 karakter, 1 büyük harf ve 1 rakam içermelidir.
 
 ---
+
+> **Güvenlik Notu:** Bu geçici şifreyi kimseyle paylaşmayın. İlk girişte yeni şifrenizi belirleyene kadar sisteme erişiminiz kısıtlıdır.
+
 > Getafix — Yatırım tavsiyesi değildir. Karar destek aracıdır.`;
 
   return sendMail({

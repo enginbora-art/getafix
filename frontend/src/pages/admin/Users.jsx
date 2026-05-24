@@ -6,7 +6,7 @@ import { tr } from 'date-fns/locale'
 import api from '../../lib/api'
 
 function NewUserModal({ onClose }) {
-  const [form, setForm] = useState({ email: '', name: '', password: '', role: 'USER' })
+  const [form, setForm] = useState({ email: '', name: '', role: 'USER' })
   const qc = useQueryClient()
   const { mutate, isPending, error } = useMutation({
     mutationFn: () => api.post('/admin/users', form),
@@ -18,7 +18,7 @@ function NewUserModal({ onClose }) {
       <div className="glass p-6 w-full max-w-md">
         <h3 className="text-lg font-semibold text-white mb-4">Yeni Kullanıcı</h3>
         <div className="space-y-3">
-          {[['Ad Soyad', 'name', 'text'], ['Email', 'email', 'email'], ['Şifre', 'password', 'password']].map(([lbl, key, type]) => (
+          {[['Ad Soyad', 'name', 'text'], ['Email', 'email', 'email']].map(([lbl, key, type]) => (
             <div key={key}>
               <label className="block text-sm text-slate-400 mb-1">{lbl}</label>
               <input type={type} value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })}
@@ -33,6 +33,9 @@ function NewUserModal({ onClose }) {
               <option value="ADMIN">ADMIN</option>
             </select>
           </div>
+          <p className="text-xs text-slate-500 bg-white/5 rounded-lg px-3 py-2">
+            Şifre otomatik oluşturulur ve kullanıcıya e-posta ile iletilir.
+          </p>
           {error && <p className="text-red-400 text-sm">{error.response?.data?.error}</p>}
           <div className="flex gap-2 pt-2">
             <button onClick={onClose} className="flex-1 btn-secondary">İptal</button>

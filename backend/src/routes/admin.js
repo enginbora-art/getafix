@@ -1,8 +1,10 @@
+const crypto = require('crypto');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const authMiddleware = require('../middleware/auth');
 const requireAdmin = require('../middleware/requireAdmin');
 const prisma = require('../lib/prisma');
+const { sendWelcomeEmail } = require('../services/email');
 
 const router = express.Router();
 
@@ -24,18 +26,24 @@ router.get('/users', async (req, res) => {
 // POST /api/admin/users
 router.post('/users', async (req, res) => {
   try {
-    const { email, name, password, role = 'USER' } = req.body;
-    if (!email || !name || !password) {
-      return res.status(400).json({ error: 'Email, isim ve şifre zorunlu' });
+    const { email, name, role = 'USER' } = req.body;
+    if (!email || !name) {
+      return res.status(400).json({ error: 'Email ve isim zorunlu' });
     }
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(409).json({ error: 'Bu email zaten kayıtlı' });
 
-    const hashed = await bcrypt.hash(password, 12);
+    const tempPassword = crypto.randomBytes(8).toString('base64url').slice(0, 12);
+    const hashed = await bcrypt.hash(tempPassword, 12);
     const user = await prisma.user.create({
-      data: { email, name, password: hashed, role },
+      data: { email, name, password: hashed, role, isActive: true, mustChangePassword: true },
       select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
     });
+
+    sendWelcomeEmail({ to: email, name, tempPassword }).catch((err) =>
+      console.error('[admin] Hoşgeldin maili gönderilemedi:', err.message),
+    );
+
     res.status(201).json(user);
   } catch (err) {
     res.status(500).json({ error: err.message });

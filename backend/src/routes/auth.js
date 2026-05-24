@@ -48,7 +48,13 @@ router.post('/login', async (req, res) => {
     const token = signToken(user.id);
     res.json({
       token,
-      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        mustChangePassword: user.mustChangePassword,
+      },
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -57,22 +63,34 @@ router.post('/login', async (req, res) => {
 
 // GET /api/auth/me
 router.get('/me', authMiddleware, (req, res) => {
-  const { id, email, name, role } = req.user;
-  res.json({ id, email, name, role });
+  const { id, email, name, role, mustChangePassword } = req.user;
+  res.json({ id, email, name, role, mustChangePassword });
 });
 
-// POST /api/auth/change-password
-router.post('/change-password', authMiddleware, async (req, res) => {
+function validatePassword(password) {
+  if (!password || password.length < 8) return 'Şifre en az 8 karakter olmalıdır';
+  if (!/[A-Z]/.test(password)) return 'En az 1 büyük harf içermelidir';
+  if (!/[0-9]/.test(password)) return 'En az 1 rakam içermelidir';
+  return null;
+}
+
+// PUT /api/auth/change-password
+router.put('/change-password', authMiddleware, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    const valid = await bcrypt.compare(currentPassword, req.user.password);
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    const valid = await bcrypt.compare(currentPassword, user.password);
     if (!valid) {
       return res.status(400).json({ error: 'Mevcut şifre hatalı' });
+    }
+    const validationError = validatePassword(newPassword);
+    if (validationError) {
+      return res.status(400).json({ error: validationError });
     }
     const hashed = await bcrypt.hash(newPassword, 12);
     await prisma.user.update({
       where: { id: req.user.id },
-      data: { password: hashed },
+      data: { password: hashed, mustChangePassword: false },
     });
     res.json({ message: 'Şifre güncellendi' });
   } catch (err) {
