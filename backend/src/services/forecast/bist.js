@@ -4,14 +4,21 @@ const { prefilterBist, getBistFilters } = require('./screener');
 const { sendForecastEmail, sendErrorEmail } = require('../email');
 const prisma = require('../../lib/prisma');
 
-// BIST 100 listesi — hardcoded fallback, production'da bist100.txt okunabilir
+// BIST 100 — bist100.txt ile senkronize (97 hisse)
 const BIST_WATCHLIST = [
-  'AKBNK', 'ARCLK', 'ASELS', 'ASTOR', 'BIMAS', 'DOHOL', 'EREGL', 'FROTO',
-  'GARAN', 'GUBRF', 'HALKB', 'HEKTS', 'ISCTR', 'KCHOL', 'KONTR', 'KOZAL',
-  'KRDMD', 'LOGO', 'MGROS', 'NETAS', 'ODAS', 'OTKAR', 'OYAKC', 'PETKM',
-  'PGSUS', 'RLYH', 'SAHOL', 'SASA', 'SISE', 'SKBNK', 'SOKM', 'TAVHL',
-  'TCELL', 'THYAO', 'TKFEN', 'TSKB', 'TTKOM', 'TTRAK', 'TUPRS', 'VAKBN',
-  'VESBE', 'VESTL', 'YKBNK', 'ZOREN',
+  'AEFES', 'AGHOL', 'AKBNK', 'AKCNS', 'AKFGY', 'AKSA',  'AKSEN', 'ALARK',
+  'ALBRK', 'ANSGR', 'ARCLK', 'ASELS', 'ASTOR', 'ASUZU', 'AYGAZ', 'BERA',
+  'BIMAS', 'BIOEN', 'BJKAS', 'BRISA', 'BRSAN', 'BRYAT', 'BUCIM', 'CCOLA',
+  'CIMSA', 'CWENE', 'DOAS',  'DOHOL', 'ECILC', 'ECZYT', 'EGEEN', 'EKGYO',
+  'ENERY', 'ENJSA', 'ENKAI', 'EREGL', 'EUPWR', 'EUREN', 'FROTO', 'GARAN',
+  'GENIL', 'GESAN', 'GUBRF', 'HALKB', 'HEKTS', 'ISCTR', 'ISGYO', 'ISMEN',
+  'IZMDC', 'KARSN', 'KCAER', 'KCHOL', 'KLSER', 'KMPUR', 'KONTR', 'KONYA',
+  'KORDS', 'KRDMD', 'KZBGY', 'LOGO',  'MAVI',  'MGROS', 'MIATK', 'ODAS',
+  'OTKAR', 'OYAKC', 'PETKM', 'PGSUS', 'PNSUT', 'QUAGR', 'REEDR', 'SAHOL',
+  'SASA',  'SDTTR', 'SELEC', 'SISE',  'SKBNK', 'SMRTG', 'SOKM',  'TABGD',
+  'TAVHL', 'TCELL', 'THYAO', 'TKFEN', 'TOASO', 'TSKB',  'TTKOM', 'TTRAK',
+  'TUPRS', 'TUREX', 'ULKER', 'VAKBN', 'VESBE', 'VESTL', 'YKBNK', 'YYLGD',
+  'ZOREN',
 ].map((c) => `${c}.IS`);
 
 function computeRsi(prices, period = 14) {

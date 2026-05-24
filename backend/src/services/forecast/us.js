@@ -4,13 +4,34 @@ const { prefilterUs, getUsFilters } = require('./screener');
 const { sendForecastEmail } = require('../email');
 const prisma = require('../../lib/prisma');
 
-// S&P 500 core + mid/small liquid universe (subset for demo)
+// S&P 500 Core + S&P 400 Mid Cap + Russell Liquid — sp500_russell.txt ile senkronize
 const US_WATCHLIST = [
-  'AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'TSLA', 'AVGO', 'LLY', 'JPM',
-  'V', 'MA', 'XOM', 'UNH', 'JNJ', 'PG', 'HD', 'MRK', 'ABBV', 'COST',
-  'NFLX', 'AMD', 'CRM', 'ORCL', 'AMAT', 'KLAC', 'LRCX', 'MRVL', 'MU', 'SMCI',
-  'APP', 'CRWD', 'DDOG', 'NET', 'SNOW', 'PLTR', 'HOOD', 'COIN', 'MSTR', 'IONQ',
-  'GEV', 'CEG', 'VST', 'EXE', 'GDDY', 'AXON', 'DECK', 'LULU', 'CELH', 'RKLB',
+  // S&P 500 Core
+  'AAPL', 'MSFT', 'NVDA', 'AMZN', 'META',  'GOOGL', 'AVGO', 'LLY',  'JPM',  'V',
+  'UNH',  'XOM',  'MA',   'JNJ',  'PG',    'HD',    'COST', 'MRK',  'ABBV', 'CVX',
+  'BAC',  'KO',   'PEP',  'WMT',  'CRM',   'NFLX',  'TMO',  'ACN',  'MCD',  'CSCO',
+  'ABT',  'LIN',  'DHR',  'TXN',  'NEE',   'PM',    'ADBE', 'NKE',  'ORCL', 'QCOM',
+  'WFC',  'RTX',  'BMY',  'AMGN', 'LOW',   'SPGI',  'UNP',  'HON',  'CAT',  'SBUX',
+  'GE',   'AXP',  'BA',   'DE',   'BLK',   'GILD',  'VRTX', 'ISRG', 'MDT',  'REGN',
+  'ZTS',  'SYK',  'ETN',  'EMR',  'ITW',   'GD',    'NOC',  'LMT',  'CTAS', 'ADP',
+  'ICE',  'CME',  'MCO',  'MSCI', 'CARR',  'AMD',   'INTC', 'MU',   'AMAT', 'LRCX',
+  'KLAC', 'MRVL', 'CDNS', 'SNPS', 'FTNT',  'PANW',  'CRWD', 'ZS',   'DDOG', 'NET',
+  'SNOW', 'PLTR', 'APP',  'HOOD', 'COIN',  'MSTR',
+  // S&P 400 Mid Cap
+  'GLOB', 'SM',   'CHRD', 'RRC',  'AR',    'EQT',   'CNX',  'MTDR', 'FANG', 'VNOM',
+  'CTRA', 'OVV',  'CRC',  'MGY',  'TALO',  'BATL',  'WTTR', 'NINE', 'KLXE', 'OIS',
+  'PUMP', 'RES',  'STEP', 'FWRD', 'SAIA',  'ODFL',  'XPO',  'JBHT', 'WERN', 'KNX',
+  'CHRW', 'EXPD', 'LSTR', 'HUBG', 'MRTN',  'HTLD',  'ARCB', 'RADX', 'GXO',  'RXO',
+  'STNG', 'HAFN', 'TNK',  'INSW', 'DHT',   'FRO',   'TK',   'NMM',  'TRMD', 'CCO',
+  'SFL',  'CMRE', 'ESEA', 'TOPS',
+  // Russell Liquid Small/Mid Cap
+  'RIOT', 'MARA', 'HUT',  'BITF', 'CIFR',  'WULF',  'IREN', 'CLSK', 'BTBT', 'HIVE',
+  'HIMS', 'ACHR', 'JOBY', 'RKLB', 'ASTS',  'LUNR',  'RDDT', 'SNAP', 'PINS', 'BMBL',
+  'MTCH', 'IAC',  'ZG',   'OPEN', 'UWMC',  'RKT',   'PFSI', 'ESNT', 'NMI',  'RDN',
+  'FICO', 'PRGS', 'ALKT', 'PCTY', 'PAYC',  'TMDX',  'AXSM', 'SRRK', 'KROS', 'IMVT',
+  'PTGX', 'RCUS', 'AGEN', 'CLOV', 'DKNG',  'PENN',  'RSI',  'GENI', 'EVEX', 'NUVL',
+  'RXRX', 'BEAM', 'EDIT', 'NTLA', 'CRSP',  'FATE',  'ALLO', 'SANA', 'FOLD', 'RARE',
+  'ACAD', 'INVA', 'PRTA', 'HRMY',
 ];
 
 function computeRsi(prices, period = 14) {
