@@ -24,23 +24,28 @@ async function safeRun(label, fn, isClosing = false) {
 }
 
 function initScheduler() {
-  // BIST sabah forecast — 00:15 TR (21:15 UTC önceki gün geçmez, 21:15 UTC = 00:15 TR+3)
-  cron.schedule('15 21 * * 1-5', () => safeRun('BIST Sabah Forecast', runBistForecast, false), {
+  // BIST sabah forecast — 00:15 İstanbul
+  cron.schedule('15 0 * * 1-5', () => safeRun('BIST Sabah Forecast', runBistForecast, false), {
     timezone: 'Europe/Istanbul',
   });
 
-  // BIST kapanış raporu — 18:15 TR (15:15 UTC)
-  cron.schedule('15 15 * * 1-5', () => safeRun('BIST Kapanış', runBistForecast, true), {
+  // BIST kapanış raporu — 18:15 İstanbul
+  cron.schedule('15 18 * * 1-5', () => safeRun('BIST Kapanış', runBistForecast, true), {
     timezone: 'Europe/Istanbul',
   });
 
-  // US sabah forecast — 15:10 TR (12:10 UTC)
-  cron.schedule('10 12 * * 1-5', () => safeRun('US Sabah Forecast', runUsForecast, false), {
+  // US sabah forecast — 15:10 İstanbul
+  cron.schedule('10 15 * * 1-5', () => safeRun('US Sabah Forecast', runUsForecast, false), {
     timezone: 'Europe/Istanbul',
   });
 
-  // US kapanış raporu — 23:15 TR (20:15 UTC)
-  cron.schedule('15 20 * * 1-5', () => safeRun('US Kapanış', runUsForecast, true), {
+  // US kapanış raporu — 23:15 İstanbul
+  cron.schedule('15 23 * * 1-5', () => safeRun('US Kapanış', runUsForecast, true), {
+    timezone: 'Europe/Istanbul',
+  });
+
+  // TEST — sil bunu
+  cron.schedule('21 0 * * *', () => console.log('[SCHEDULER] Test cron çalıştı — silmeyi unutma!'), {
     timezone: 'Europe/Istanbul',
   });
 

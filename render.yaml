@@ -28,6 +28,8 @@ services:
         sync: false
       - key: FRONTEND_URL
         sync: false
+      - key: TZ
+        value: Europe/Istanbul
 
   - type: web
     name: getafix-web
