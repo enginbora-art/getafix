@@ -216,9 +216,9 @@ async function runUsForecast(isClosing = false) {
 
   console.log('[US] Ajanlar çalışıyor...');
   const [agent1Out, agent2Out, agent3Out] = await Promise.all([
-    callAgent('US', 'technical', `Today is ${todayStr}. Analyze these US stocks:\n\n${stockBlock}\n\nFor each stock: BUY / WAIT / AVOID + one-line reason.`),
-    callAgent('US', 'fundamental', `Today is ${todayStr}. Evaluate these US stocks fundamentally:\n\n${stockBlock}\n\nFor each stock: story intact or broken? One sentence verdict.`),
-    callAgent('US', 'sentiment', `Today is ${todayStr}. Find news, catalysts, and sentiment for:\n\n${stockBlock}\n\nFor each stock: IGNITION / NEUTRAL / HEADWIND + specific catalyst. Mark unverified info as RUMOR.`),
+    callAgent('US', 'technical', `Today is ${todayStr}. Analyze these US stocks:\n\n${stockBlock}\n\nFor each stock: BUY / WAIT / AVOID + one-line reason.`, 2500),
+    callAgent('US', 'fundamental', `Today is ${todayStr}. Evaluate these US stocks fundamentally:\n\n${stockBlock}\n\nFor each stock: story intact or broken? One sentence verdict.`, 2500),
+    callAgent('US', 'sentiment', `Today is ${todayStr}. Find news, catalysts, and sentiment for:\n\n${stockBlock}\n\nFor each stock: IGNITION / NEUTRAL / HEADWIND + specific catalyst. Mark unverified info as RUMOR.`, 2500),
   ]);
 
   console.log('[US] Yönetici sentez yapıyor...');
