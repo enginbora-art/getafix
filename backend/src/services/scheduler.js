@@ -44,11 +44,6 @@ function initScheduler() {
     timezone: 'Europe/Istanbul',
   });
 
-  // TEST — sil bunu
-  cron.schedule('21 0 * * *', () => console.log('[SCHEDULER] Test cron çalıştı — silmeyi unutma!'), {
-    timezone: 'Europe/Istanbul',
-  });
-
   console.log('[scheduler] Tüm zamanlamalar aktif');
 }
 
