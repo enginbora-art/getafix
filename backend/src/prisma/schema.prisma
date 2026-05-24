@@ -68,19 +68,22 @@ model FilterConfig {
 }
 
 model ManualRequest {
-  id        String        @id @default(cuid())
-  userId    String
-  user      User          @relation(fields: [userId], references: [id])
-  market    Market
-  ticker    String
-  status    RequestStatus @default(PENDING)
-  result    String?       @db.Text
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id           String        @id @default(cuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id])
+  market       Market
+  ticker       String
+  status       RequestStatus @default(PENDING)
+  result       String?       @db.Text
+  currentStep  String?
+  currentPrice Float?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
 
 enum RequestStatus {
   PENDING
+  QUEUED
   PROCESSING
   DONE
   FAILED

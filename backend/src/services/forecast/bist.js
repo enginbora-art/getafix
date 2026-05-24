@@ -308,10 +308,14 @@ Raporun TAMAMEN SONUNA (raporun dışına) şu JSON bloğunu ekle — bu blok ku
 \`\`\``;
 }
 
-async function runManualAnalysis(ticker) {
+async function runManualAnalysis(ticker, onStep = null) {
   const tickerYf = `${ticker}.IS`;
+
+  await onStep?.('Veri çekiliyor...');
   const techFull = await fetchTechnicalSnapshot([tickerYf]);
   const fundFull = await fetchFundamentalSnapshot([tickerYf]);
+
+  const currentPrice = techFull[tickerYf]?.price ?? null;
 
   const compressed = compressForAgent(techFull, fundFull);
   const dateStr = new Date().toLocaleDateString('tr-TR');
@@ -374,8 +378,9 @@ Bu öneri ne zaman yanlış olur? [1 cümle]
 }
 \`\`\``;
 
+  await onStep?.('Yönetici sentez yapıyor...');
   const result = await callAgentWithWebSearch('BIST', 'manager', prompt);
-  return result;
+  return { result, currentPrice };
 }
 
 module.exports = { runBistForecast, runManualAnalysis };

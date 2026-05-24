@@ -371,10 +371,14 @@ Raporun TAMAMEN SONUNA şu JSON bloğunu ekle (kullanıcıya gösterilmeyecek):
 \`\`\``;
 }
 
-async function runManualAnalysis(ticker) {
+async function runManualAnalysis(ticker, onStep = null) {
+  await onStep?.('Veri çekiliyor...');
   const spyReturns = await fetchSpyReturns();
   const techFull = await fetchTechnicalSnapshot([ticker]);
   const fundFull = await fetchFundamentalSnapshot([ticker]);
+
+  const currentPrice = techFull[ticker]?.price ?? null;
+
   const stockBlock = compressForAgent(techFull, fundFull, spyReturns);
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -432,7 +436,9 @@ Bu öneri ne zaman yanlış olur? [1 cümle]
   "thesis_summary": "Tez özeti."
 }
 \`\`\``;
-  return callAgent('US', 'manager', prompt, 2000);
+  await onStep?.('Yönetici sentez yapıyor...');
+  const result = await callAgent('US', 'manager', prompt, 2000);
+  return { result, currentPrice };
 }
 
 module.exports = { runUsForecast, runManualAnalysis };
