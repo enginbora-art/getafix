@@ -9,6 +9,13 @@ import api from '../lib/api'
 
 const stripJsonBlocks = (content) => (content || '').replace(/```json[\s\S]*?```/g, '').trim()
 
+const normalizeTicker = (val) => val.toUpperCase()
+  .replace(/İ/g, 'I').replace(/Ğ/g, 'G').replace(/Ü/g, 'U')
+  .replace(/Ş/g, 'S').replace(/Ö/g, 'O').replace(/Ç/g, 'C')
+  .replace(/ı/g, 'I').replace(/ğ/g, 'G').replace(/ü/g, 'U')
+  .replace(/ş/g, 'S').replace(/ö/g, 'O').replace(/ç/g, 'C')
+  .replace(/[^A-Z0-9.-]/g, '')
+
 const STATUS_CONFIG = {
   PENDING:    { label: 'Bekliyor',   color: 'text-yellow-400', Icon: Clock },
   QUEUED:     { label: 'Kuyrukta',   color: 'text-orange-400', Icon: Clock },
@@ -52,7 +59,7 @@ function MarketForm({ market, label, placeholder }) {
           <label className="block text-sm font-medium text-slate-400 mb-1.5">Hisse</label>
           <input
             value={ticker}
-            onChange={(e) => setTicker(e.target.value.toUpperCase())}
+            onChange={(e) => setTicker(normalizeTicker(e.target.value))}
             placeholder={placeholder}
             className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-slate-100 placeholder-slate-600 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
           />

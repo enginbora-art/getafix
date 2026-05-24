@@ -236,6 +236,18 @@ function parseForecastJson(text) {
   }
 }
 
+function buildUsTechPrompt(stockBlock, todayStr) {
+  return `Today is ${todayStr}. Analyze these US stocks:\n\n${stockBlock}\n\nFor each stock: BUY / WAIT / AVOID + one-line reason.`;
+}
+
+function buildUsFundPrompt(stockBlock, todayStr) {
+  return `Today is ${todayStr}. Evaluate these US stocks fundamentally:\n\n${stockBlock}\n\nFor each stock: story intact or broken? One sentence verdict.`;
+}
+
+function buildUsSentPrompt(stockBlock, todayStr) {
+  return `Today is ${todayStr}. Find news, catalysts, and sentiment for:\n\n${stockBlock}\n\nFor each stock: IGNITION / NEUTRAL / HEADWIND + specific catalyst. Mark unverified info as RUMOR.`;
+}
+
 async function runUsForecast(isClosing = false) {
   const now = new Date();
   const todayStr = now.toISOString().split('T')[0];
@@ -260,9 +272,9 @@ async function runUsForecast(isClosing = false) {
 
   console.log('[US] Ajanlar çalışıyor...');
   const [agent1Out, agent2Out, agent3Out] = await Promise.all([
-    callAgent('US', 'technical', `Today is ${todayStr}. Analyze these US stocks:\n\n${stockBlock}\n\nFor each stock: BUY / WAIT / AVOID + one-line reason.`, 2500),
-    callAgent('US', 'fundamental', `Today is ${todayStr}. Evaluate these US stocks fundamentally:\n\n${stockBlock}\n\nFor each stock: story intact or broken? One sentence verdict.`, 2500),
-    callAgent('US', 'sentiment', `Today is ${todayStr}. Find news, catalysts, and sentiment for:\n\n${stockBlock}\n\nFor each stock: IGNITION / NEUTRAL / HEADWIND + specific catalyst. Mark unverified info as RUMOR.`, 2500),
+    callAgent('US', 'technical', buildUsTechPrompt(stockBlock, todayStr), 2500),
+    callAgent('US', 'fundamental', buildUsFundPrompt(stockBlock, todayStr), 2500),
+    callAgent('US', 'sentiment', buildUsSentPrompt(stockBlock, todayStr), 2500),
   ]);
 
   console.log('[US] Yönetici sentez yapıyor...');
@@ -372,72 +384,33 @@ Raporun TAMAMEN SONUNA şu JSON bloğunu ekle (kullanıcıya gösterilmeyecek):
 }
 
 async function runManualAnalysis(ticker, onStep = null) {
+  const todayStr = new Date().toISOString().split('T')[0];
+
   await onStep?.('Veri çekiliyor...');
   const spyReturns = await fetchSpyReturns();
   const techFull = await fetchTechnicalSnapshot([ticker]);
   const fundFull = await fetchFundamentalSnapshot([ticker]);
 
   const currentPrice = techFull[ticker]?.price ?? null;
-
   const stockBlock = compressForAgent(techFull, fundFull, spyReturns);
-  const todayStr = new Date().toISOString().split('T')[0];
 
-  const prompt = `Today is ${todayStr}. Analyze this US stock: ${ticker}
+  await onStep?.('Ajan 1 — Teknik analiz yapılıyor...');
+  const agent1Out = await callAgent('US', 'technical', buildUsTechPrompt(stockBlock, todayStr), 2500);
 
-${stockBlock}
+  await onStep?.('Ajan 2 — Temel analiz yapılıyor...');
+  const agent2Out = await callAgent('US', 'fundamental', buildUsFundPrompt(stockBlock, todayStr), 2500);
 
-GÖREV — Aşağıdaki FORMATI BİREBİR kullanarak TÜRKÇE Markdown rapor yaz:
+  await onStep?.('Ajan 3 — Haberler ve piyasa duygusu taranıyor...');
+  const agent3Out = await callAgent('US', 'sentiment', buildUsSentPrompt(stockBlock, todayStr), 2500);
 
-# ${ticker} Analiz — ${todayStr}
-
-## ⚡ KARAR: [AL veya SAT veya BEKLE]
-
-| | |
-|---|---|
-| **Giriş bandı** | $XXX – $XXX |
-| **Stop-loss** | $XXX |
-| **Hedef 1 (kısa vade, 1-5 gün)** | $XXX |
-| **Hedef 2 (orta vade, 1-4 hafta)** | $XXX |
-| **Risk seviyesi** | Düşük / Orta / Yüksek |
-| **Risk/Getiri** | 1:X.X |
-
----
-
-## Neden?
-[Max 3 cümle]
-
-## Teknik Görüş
-[RSI, ATR, MA, hacim, SPY göreceli güç — 2-3 cümle]
-
-## Temel Görüş
-[Büyüme, değerleme — 2-3 cümle]
-
-## Piyasa Duygusu
-[Haberler, katalizörler — 2-3 cümle]
-
-## Risk
-Bu öneri ne zaman yanlış olur? [1 cümle]
-
----
-> Yatırım tavsiyesi değildir.
-
-\`\`\`json
-{
-  "date": "${todayStr}",
-  "ticker": "${ticker}",
-  "entry_low": 0.00,
-  "entry_high": 0.00,
-  "stop_loss": 0.00,
-  "target_short_low": 0.00,
-  "target_short_high": 0.00,
-  "target_mid_low": 0.00,
-  "target_mid_high": 0.00,
-  "risk_level": "Düşük/Orta/Yüksek",
-  "thesis_summary": "Tez özeti."
-}
-\`\`\``;
   await onStep?.('Yönetici sentez yapıyor...');
-  const result = await callAgent('US', 'manager', prompt, 2000);
+  const fund = fundFull[ticker] || {};
+  const segmentContext = `${ticker}: ${fund.market_cap_segment || 'unknown'}cap, ${fund.sector || 'Unknown'} sector`;
+  const sum1 = summarizeForPeer(agent1Out, 1200);
+  const sum2 = summarizeForPeer(agent2Out, 1200);
+  const sum3 = summarizeForPeer(agent3Out, 1200);
+  const result = await callAgent('US', 'manager', buildUsManagerPrompt([ticker], segmentContext, sum1, sum2, sum3, stockBlock, todayStr), 3000);
+
   return { result, currentPrice };
 }
 

@@ -165,6 +165,18 @@ function parseForecastJson(text) {
   }
 }
 
+function buildTechPrompt(data, dateStr) {
+  return `Aşağıdaki ön filtrelenmiş BIST kağıtlarının teknik snapshot'ı verilmiştir.\nTarih: ${dateStr}\n\nVERİ:\n${JSON.stringify(data, null, 2)}\n\nGörev:\n1. Her kağıt için trend, momentum, RSI yorumu, hacim okuması\n2. SMA20/SMA50 kesişimleri ve fiyat-MA pozisyonunu yorumla\n3. Aşırı alım/satım uyarıları\n4. TOP 3 teknik açıdan en iyi kağıdı seç ve gerekçelendir\n5. Her TOP 3 kağıt için risk seviyesi (1-10)\n\nÖzlü ol, gevezelik etme.`;
+}
+
+function buildFundPrompt(data, dateStr) {
+  return `Aşağıdaki ön filtrelenmiş BIST kağıtlarının temel veri snapshot'ı verilmiştir.\nTarih: ${dateStr}\n\nVERİ:\n${JSON.stringify(data, null, 2)}\n\nGörev:\n1. Her kağıt için değerleme (ucuz/normal/pahalı), bilanço sağlığı, büyüme profili\n2. Sektör emsallerine göre konum\n3. Risk faktörleri (yüksek borç, düşük marj vb.)\n4. TOP 3 temel analiz açısından en cazip kağıdı seç ve gerekçelendir\n\nÖzlü ol.`;
+}
+
+function buildSentPrompt(codes, dateStr) {
+  return `Bugün ${dateStr} tarihi itibariyle aşağıdaki BIST kağıtları için piyasa sentiment ve haber/söylenti araştırması yap:\n\nKAĞITLAR: ${codes.join(', ')}\n\nGörev:\n1. Web araması ile her kağıt için son 7 gün içindeki önemli haberler / KAP açıklamaları\n2. Sosyal medya / forum / yatırımcı kanallarındaki sentiment\n3. Global makro konjonktür etkisi (Fed faiz, dolar/TL, emtia, jeopolitik)\n4. Sektörel rüzgar\n5. Doğrulanmamış spekülasyonu açıkça "söylenti" olarak işaretle\n6. TOP 3 sentiment olarak en pozitif kağıt — gerekçeleriyle\n\nÖnemli: Doğrulanmış haberi söylenti ile karıştırma.`;
+}
+
 async function runBistForecast(isClosing = false) {
   const now = new Date();
   console.log(`[BIST] Forecast başladı — ${now.toISOString()} isClosing=${isClosing}`);
@@ -189,12 +201,10 @@ async function runBistForecast(isClosing = false) {
   );
 
   const dateStr = now.toLocaleDateString('tr-TR');
-  const techPrompt = `Aşağıdaki ön filtrelenmiş BIST kağıtlarının teknik snapshot'ı verilmiştir.\nTarih: ${dateStr}\n\nVERİ:\n${JSON.stringify(techData, null, 2)}\n\nGörev:\n1. Her kağıt için trend, momentum, RSI yorumu, hacim okuması\n2. SMA20/SMA50 kesişimleri ve fiyat-MA pozisyonunu yorumla\n3. Aşırı alım/satım uyarıları\n4. TOP 3 teknik açıdan en iyi kağıdı seç ve gerekçelendir\n5. Her TOP 3 kağıt için risk seviyesi (1-10)\n\nÖzlü ol, gevezelik etme.`;
-
-  const fundPrompt = `Aşağıdaki ön filtrelenmiş BIST kağıtlarının temel veri snapshot'ı verilmiştir.\nTarih: ${dateStr}\n\nVERİ:\n${JSON.stringify(fundData, null, 2)}\n\nGörev:\n1. Her kağıt için değerleme (ucuz/normal/pahalı), bilanço sağlığı, büyüme profili\n2. Sektör emsallerine göre konum\n3. Risk faktörleri (yüksek borç, düşük marj vb.)\n4. TOP 3 temel analiz açısından en cazip kağıdı seç ve gerekçelendir\n\nÖzlü ol.`;
-
   const bistCodes = candidates.map((t) => t.replace('.IS', ''));
-  const sentPrompt = `Bugün ${dateStr} tarihi itibariyle aşağıdaki BIST kağıtları için piyasa sentiment ve haber/söylenti araştırması yap:\n\nKAĞITLAR: ${bistCodes.join(', ')}\n\nGörev:\n1. Web araması ile her kağıt için son 7 gün içindeki önemli haberler / KAP açıklamaları\n2. Sosyal medya / forum / yatırımcı kanallarındaki sentiment\n3. Global makro konjonktür etkisi (Fed faiz, dolar/TL, emtia, jeopolitik)\n4. Sektörel rüzgar\n5. Doğrulanmamış spekülasyonu açıkça "söylenti" olarak işaretle\n6. TOP 3 sentiment olarak en pozitif kağıt — gerekçeleriyle\n\nÖnemli: Doğrulanmış haberi söylenti ile karıştırma.`;
+  const techPrompt = buildTechPrompt(techData, dateStr);
+  const fundPrompt = buildFundPrompt(fundData, dateStr);
+  const sentPrompt = buildSentPrompt(bistCodes, dateStr);
 
   console.log('[BIST] Ajanlar çalışıyor...');
   const [techV1, fundV1, sentV1] = await Promise.all([
@@ -310,76 +320,33 @@ Raporun TAMAMEN SONUNA (raporun dışına) şu JSON bloğunu ekle — bu blok ku
 
 async function runManualAnalysis(ticker, onStep = null) {
   const tickerYf = `${ticker}.IS`;
+  const dateStr = new Date().toLocaleDateString('tr-TR');
 
   await onStep?.('Veri çekiliyor...');
   const techFull = await fetchTechnicalSnapshot([tickerYf]);
   const fundFull = await fetchFundamentalSnapshot([tickerYf]);
 
   const currentPrice = techFull[tickerYf]?.price ?? null;
-
   const compressed = compressForAgent(techFull, fundFull);
-  const dateStr = new Date().toLocaleDateString('tr-TR');
-  const today = new Date().toISOString().split('T')[0];
 
-  const prompt = `Aşağıdaki BIST kağıdı için kapsamlı analiz yap.
-Tarih: ${dateStr} | Kağıt: ${ticker}
+  await onStep?.('Ajan 1 — Teknik analiz yapılıyor...');
+  const techV1 = await callAgent('BIST', 'technical', buildTechPrompt(compressed, dateStr));
 
-VERİ:
-${JSON.stringify(compressed, null, 2)}
+  await onStep?.('Ajan 2 — Temel analiz yapılıyor...');
+  const fundV1 = await callAgent('BIST', 'fundamental', buildFundPrompt(compressed, dateStr));
 
-RAPOR FORMATI — BİREBİR UY:
+  await onStep?.('Ajan 3 — Haberler ve piyasa duygusu taranıyor...');
+  const sentV1 = await callAgentWithWebSearch('BIST', 'sentiment', buildSentPrompt([ticker], dateStr));
 
-# ${ticker} Analiz — ${dateStr}
-
-## ⚡ KARAR: [AL veya SAT veya BEKLE]
-
-| | |
-|---|---|
-| **Giriş bandı** | XXX – XXX TL |
-| **Stop-loss** | XXX TL |
-| **Hedef 1 (kısa vade, 1-5 gün)** | XXX TL |
-| **Hedef 2 (orta vade, 1-4 hafta)** | XXX TL |
-| **Risk seviyesi** | Düşük / Orta / Yüksek |
-| **Risk/Getiri** | 1:X.X |
-
----
-
-## Neden?
-[Max 3 cümle — neden bu karar, ne görüyorsun]
-
-## Teknik Görüş
-[RSI, MA, hacim, momentum — 2-3 cümle]
-
-## Temel Görüş
-[Değerleme, büyüme, bilanço — 2-3 cümle]
-
-## Piyasa Duygusu
-[Son haberler, KAP bildirimleri, katalizörler — web araması yap]
-
-## Risk
-Bu öneri ne zaman yanlış olur? [1 cümle]
-
----
-> Yatırım tavsiyesi değildir.
-
-\`\`\`json
-{
-  "date": "${today}",
-  "ticker": "${ticker}",
-  "entry_low": 0.00,
-  "entry_high": 0.00,
-  "stop_loss": 0.00,
-  "target_short_low": 0.00,
-  "target_short_high": 0.00,
-  "target_mid_low": 0.00,
-  "target_mid_high": 0.00,
-  "risk_level": "Düşük/Orta/Yüksek",
-  "thesis_summary": "Tez özeti."
-}
-\`\`\``;
+  await onStep?.('Tartışma turu — Ajanlar görüş alışverişi yapıyor...');
+  const [techV2, fundV2] = await Promise.all([
+    callAgent('BIST', 'technical', buildTechPrompt(compressed, dateStr) + `\n\nDİĞER AJANLARIN GÖRÜŞLERİ:\n[Temel analist özeti]\n${summarizeForPeer(fundV1)}\n\n[Sentiment özeti]\n${summarizeForPeer(sentV1)}\n\nBu görüşleri okuyup değerlendirmeni güncelle. Çelişkili noktalarda teknik gerekçeni daha net koy, ortak görüşte pekiştir.`),
+    callAgent('BIST', 'fundamental', buildFundPrompt(compressed, dateStr) + `\n\nDİĞER AJANLARIN GÖRÜŞLERİ:\n[Teknik analist özeti]\n${summarizeForPeer(techV1)}\n\n[Sentiment özeti]\n${summarizeForPeer(sentV1)}\n\nTeknik tablo iyi ama temelde zayıf bir kağıt varsa açıkça belirt. Tersi de geçerli.`),
+  ]);
 
   await onStep?.('Yönetici sentez yapıyor...');
-  const result = await callAgentWithWebSearch('BIST', 'manager', prompt);
+  const result = await callAgent('BIST', 'manager', buildManagerPrompt(techV2, fundV2, sentV1, dateStr, [ticker]), 3000);
+
   return { result, currentPrice };
 }
 
