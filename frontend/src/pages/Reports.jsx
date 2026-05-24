@@ -2,9 +2,14 @@ import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Download, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
 import api from '../lib/api'
 import ReportCard from '../components/ReportCard'
+
+function stripJsonBlocks(content) {
+  return (content || '').replace(/```json[\s\S]*?```/g, '').trim()
+}
 
 function ReportDetail({ id }) {
   const navigate = useNavigate()
@@ -34,8 +39,15 @@ function ReportDetail({ id }) {
           <Download size={16} /> PDF İndir
         </button>
       </div>
-      <div className="glass p-8 prose prose-invert max-w-none prose-headings:text-teal-400 prose-strong:text-white prose-code:text-teal-300">
-        <ReactMarkdown>{report.content}</ReactMarkdown>
+      <div className="glass p-8 prose prose-invert max-w-none
+        prose-headings:text-teal-400 prose-strong:text-white
+        prose-table:w-full prose-table:border-collapse
+        prose-th:border prose-th:border-white/10 prose-th:p-3 prose-th:text-left prose-th:bg-white/5
+        prose-td:border prose-td:border-white/10 prose-td:p-3
+        prose-tr:border-b prose-tr:border-white/5
+        [&_h2:has(⚡)]:text-2xl [&_h2:has(⚡)]:font-black [&_h2:has(⚡)]:text-white [&_h2:has(⚡)]:mb-4
+        [&_table]:my-4 [&_table]:rounded-lg [&_table]:overflow-hidden">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{stripJsonBlocks(report.content)}</ReactMarkdown>
       </div>
     </div>
   )

@@ -1,10 +1,13 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Search, Clock, CheckCircle, XCircle, Loader } from 'lucide-react'
 import { format } from 'date-fns'
 import { tr } from 'date-fns/locale'
 import api from '../lib/api'
+
+const stripJsonBlocks = (content) => (content || '').replace(/```json[\s\S]*?```/g, '').trim()
 
 const STATUS_CONFIG = {
   PENDING: { label: 'Bekliyor', color: 'text-yellow-400', Icon: Clock },
@@ -101,8 +104,8 @@ export default function Analysis() {
               {req.status === 'DONE' && req.result && (
                 <div className="mt-3">
                   {selected === req.id ? (
-                    <div className="mt-3 p-4 bg-white/5 rounded-lg prose prose-sm prose-invert max-w-none prose-headings:text-teal-400">
-                      <ReactMarkdown>{req.result}</ReactMarkdown>
+                    <div className="mt-3 p-4 bg-white/5 rounded-lg prose prose-sm prose-invert max-w-none prose-headings:text-teal-400 prose-table:w-full prose-table:border-collapse prose-th:border prose-th:border-white/10 prose-th:p-3 prose-th:bg-white/5 prose-td:border prose-td:border-white/10 prose-td:p-3">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{stripJsonBlocks(req.result)}</ReactMarkdown>
                       <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-white text-xs mt-2">Gizle</button>
                     </div>
                   ) : (

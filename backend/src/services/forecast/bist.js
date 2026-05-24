@@ -208,6 +208,7 @@ async function runBistForecast(isClosing = false) {
 }
 
 function buildManagerPrompt(techView, fundView, sentView, dateStr, bistCodes) {
+  const today = new Date().toISOString().split('T')[0];
   return `Üç uzman ajanın final değerlendirmeleri aşağıdadır.
 
 ═══ AJAN 1 — TEKNİK ANALİZ ═══
@@ -219,38 +220,50 @@ ${fundView}
 ═══ AJAN 3 — SENTIMENT / HABER ═══
 ${sentView}
 
-GÖREV — Aşağıdaki yapıda bir nihai rapor üret (Markdown):
+GÖREV — Aşağıdaki FORMATI BİREBİR kullanarak Markdown rapor yaz:
+
+---RAPOR BAŞLANGICI---
 
 # BIST Günlük Öneri — ${dateStr}
 
-## Yönetici özeti
-3-4 cümle ile günün makro fotoğrafı ve ana karar.
+## ⚡ KARAR: [AL veya SAT veya BEKLE]
 
-## Üç ajanın uyuştuğu / ayrıştığı noktalar
-- **Uyum:** ...
-- **Ayrışma:** ...
-
-## Nihai öneri: [TEK BİR BIST KODU]
-- **Tez:** Neden bu kağıt? (3-5 cümle)
-- **Giriş bandı:** ... TL aralığı
-- **Stop-loss:** ... TL (gerekçesiyle)
-- **Hedef bant:**
-  - Kısa vade (1-5 gün): ... TL
-  - Orta vade (1-4 hafta): ... TL
-- **Risk seviyesi:** Düşük / Orta / Yüksek
-- **Bu öneri hangi senaryoda yanlış olur?**
-
-## Eleme nedenleri
-İlk 3'e giren ama seçilmeyen kağıtlar için kısa not.
+| | |
+|---|---|
+| **Giriş bandı** | XXX – XXX TL |
+| **Stop-loss** | XXX TL |
+| **Hedef 1 (kısa vade, 1-5 gün)** | XXX TL |
+| **Hedef 2 (orta vade, 1-4 hafta)** | XXX TL |
+| **Risk seviyesi** | Düşük / Orta / Yüksek |
+| **Risk/Getiri** | 1:X.X |
 
 ---
-> **Uyarı:** Bu rapor yatırım tavsiyesi değildir.
 
-Markdown raporun EN SONUNA bir \`\`\`json\`\`\` bloğu ekle:
+## Neden?
+[Bu kağıdı seçme gerekçesi — max 3 cümle, somut ve net. Neden bu kağıt, neden şimdi.]
+
+## Teknik Görüş
+[Momentum, RSI, hacim, MA pozisyonu — 2-3 cümle]
+
+## Temel Görüş
+[Büyüme hikayesi, değerleme, bilanço — 2-3 cümle]
+
+## Piyasa Duygusu
+[Haberler, katalizörler, sektör — 2-3 cümle]
+
+## Risk
+Bu öneri ne zaman yanlış olur? [Tek cümle — en kritik risk faktörü]
+
+---
+> Yatırım tavsiyesi değildir. Karar destek aracıdır.
+
+---RAPOR SONU---
+
+Raporun TAMAMEN SONUNA (raporun dışına) şu JSON bloğunu ekle — bu blok kullanıcıya gösterilmeyecek, sadece sistem tarafından okunacak:
 
 \`\`\`json
 {
-  "date": "${new Date().toISOString().split('T')[0]}",
+  "date": "${today}",
   "ticker": "BIST_KODU",
   "entry_low": 0.00,
   "entry_high": 0.00,
@@ -272,8 +285,64 @@ async function runManualAnalysis(ticker) {
 
   const compressed = compressForAgent(techFull, fundFull);
   const dateStr = new Date().toLocaleDateString('tr-TR');
+  const today = new Date().toISOString().split('T')[0];
 
-  const prompt = `Aşağıdaki BIST kağıdı için kapsamlı analiz yap:\nTarih: ${dateStr}\n\nVERİ:\n${JSON.stringify(compressed, null, 2)}\n\nTeknik, temel ve genel değerlendirme yap. Giriş, stop ve hedef seviyeleri öner.`;
+  const prompt = `Aşağıdaki BIST kağıdı için kapsamlı analiz yap.
+Tarih: ${dateStr} | Kağıt: ${ticker}
+
+VERİ:
+${JSON.stringify(compressed, null, 2)}
+
+RAPOR FORMATI — BİREBİR UY:
+
+# ${ticker} Analiz — ${dateStr}
+
+## ⚡ KARAR: [AL veya SAT veya BEKLE]
+
+| | |
+|---|---|
+| **Giriş bandı** | XXX – XXX TL |
+| **Stop-loss** | XXX TL |
+| **Hedef 1 (kısa vade, 1-5 gün)** | XXX TL |
+| **Hedef 2 (orta vade, 1-4 hafta)** | XXX TL |
+| **Risk seviyesi** | Düşük / Orta / Yüksek |
+| **Risk/Getiri** | 1:X.X |
+
+---
+
+## Neden?
+[Max 3 cümle — neden bu karar, ne görüyorsun]
+
+## Teknik Görüş
+[RSI, MA, hacim, momentum — 2-3 cümle]
+
+## Temel Görüş
+[Değerleme, büyüme, bilanço — 2-3 cümle]
+
+## Piyasa Duygusu
+[Son haberler, KAP bildirimleri, katalizörler — web araması yap]
+
+## Risk
+Bu öneri ne zaman yanlış olur? [1 cümle]
+
+---
+> Yatırım tavsiyesi değildir.
+
+\`\`\`json
+{
+  "date": "${today}",
+  "ticker": "${ticker}",
+  "entry_low": 0.00,
+  "entry_high": 0.00,
+  "stop_loss": 0.00,
+  "target_short_low": 0.00,
+  "target_short_high": 0.00,
+  "target_mid_low": 0.00,
+  "target_mid_high": 0.00,
+  "risk_level": "Düşük/Orta/Yüksek",
+  "thesis_summary": "Tez özeti."
+}
+\`\`\``;
 
   const result = await callAgentWithWebSearch('BIST', 'manager', prompt);
   return result;

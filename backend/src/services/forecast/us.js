@@ -256,7 +256,7 @@ async function runUsForecast(isClosing = false) {
 function buildUsManagerPrompt(candidates, segmentContext, sum1, sum2, sum3, stockBlock, todayStr) {
   return `Today is ${todayStr}. Stocks under analysis: ${candidates.join(', ')}
 
-MARKET SEGMENT CONTEXT (from quantitative screener):
+MARKET SEGMENT CONTEXT:
 ${segmentContext}
 
 ${sum1}
@@ -268,35 +268,47 @@ ${sum3}
 Raw quantitative data:
 ${stockBlock}
 
-Output the full structured report in Turkish (JSON block stays in English):
+GÖREV — Aşağıdaki FORMATI BİREBİR kullanarak TÜRKÇE Markdown rapor yaz:
+
+---RAPOR BAŞLANGICI---
 
 # US Momentum Günlük Öneri — ${todayStr}
 
-## Piyasa Segment Bağlamı
-[Segment context + one sentence interpretation]
+## ⚡ KARAR: [AL veya SAT veya BEKLE]
 
-## Yönetici Özeti
-[3-4 sentences]
-
-## Ajan Uyumu / Ayrışması
-- **Uyum:** ...
-- **Ayrışma:** ...
-
-## Nihai Öneri: [TICKER] ([segment] cap, [sector])
-- **Tez:** ...
-- **Giriş bandı:** $[low] – $[high]
-- **Stop-loss:** $[price]
-- **Hedefler:**
-  - Kısa vade (1-5 gün): $[low] – $[high]
-  - Orta vade (1-4 hafta): $[low] – $[high]
-- **Risk seviyesi:** Düşük / Orta / Yüksek
-- **Bu trade'i ne öldürür?** ...
-
-## Diğer Adaylar
-[Top 3 runners-up, brief reason]
+| | |
+|---|---|
+| **Hisse** | TICKER ([segment] cap, [sector]) |
+| **Giriş bandı** | $XXX – $XXX |
+| **Stop-loss** | $XXX |
+| **Hedef 1 (kısa vade, 1-5 gün)** | $XXX |
+| **Hedef 2 (orta vade, 1-4 hafta)** | $XXX |
+| **Risk seviyesi** | Düşük / Orta / Yüksek |
+| **Risk/Getiri** | 1:X.X |
 
 ---
-> Bilgi amaçlıdır. Yatırım tavsiyesi değildir.
+
+## Neden?
+[Bu hisseyi seçme gerekçesi — max 3 cümle. Neden bu hisse, neden şimdi, segment bağlamıyla açıkla.]
+
+## Teknik Görüş
+[RSI, ATR, MA, hacim, SPY'a göre güç — 2-3 cümle]
+
+## Temel Görüş
+[Büyüme hikayesi, değerleme, kazanç — 2-3 cümle]
+
+## Piyasa Duygusu
+[Haberler, katalizörler, makro — 2-3 cümle]
+
+## Risk
+Bu öneri ne zaman yanlış olur? [Tek cümle]
+
+---
+> Yatırım tavsiyesi değildir.
+
+---RAPOR SONU---
+
+Raporun TAMAMEN SONUNA şu JSON bloğunu ekle (kullanıcıya gösterilmeyecek):
 
 \`\`\`json
 {
@@ -309,8 +321,8 @@ Output the full structured report in Turkish (JSON block stays in English):
   "target_short_high": 0.00,
   "target_mid_low": 0.00,
   "target_mid_high": 0.00,
-  "risk_level": "Medium",
-  "thesis_summary": "One sentence."
+  "risk_level": "Düşük/Orta/Yüksek",
+  "thesis_summary": "Tez özeti."
 }
 \`\`\``;
 }
@@ -322,7 +334,60 @@ async function runManualAnalysis(ticker) {
   const stockBlock = compressForAgent(techFull, fundFull, spyReturns);
   const todayStr = new Date().toISOString().split('T')[0];
 
-  const prompt = `Today is ${todayStr}. Comprehensive analysis for:\n\n${stockBlock}\n\nProvide entry zone, stop-loss, short and mid-term targets. Translate final report to Turkish.`;
+  const prompt = `Today is ${todayStr}. Analyze this US stock: ${ticker}
+
+${stockBlock}
+
+GÖREV — Aşağıdaki FORMATI BİREBİR kullanarak TÜRKÇE Markdown rapor yaz:
+
+# ${ticker} Analiz — ${todayStr}
+
+## ⚡ KARAR: [AL veya SAT veya BEKLE]
+
+| | |
+|---|---|
+| **Giriş bandı** | $XXX – $XXX |
+| **Stop-loss** | $XXX |
+| **Hedef 1 (kısa vade, 1-5 gün)** | $XXX |
+| **Hedef 2 (orta vade, 1-4 hafta)** | $XXX |
+| **Risk seviyesi** | Düşük / Orta / Yüksek |
+| **Risk/Getiri** | 1:X.X |
+
+---
+
+## Neden?
+[Max 3 cümle]
+
+## Teknik Görüş
+[RSI, ATR, MA, hacim, SPY göreceli güç — 2-3 cümle]
+
+## Temel Görüş
+[Büyüme, değerleme — 2-3 cümle]
+
+## Piyasa Duygusu
+[Haberler, katalizörler — 2-3 cümle]
+
+## Risk
+Bu öneri ne zaman yanlış olur? [1 cümle]
+
+---
+> Yatırım tavsiyesi değildir.
+
+\`\`\`json
+{
+  "date": "${todayStr}",
+  "ticker": "${ticker}",
+  "entry_low": 0.00,
+  "entry_high": 0.00,
+  "stop_loss": 0.00,
+  "target_short_low": 0.00,
+  "target_short_high": 0.00,
+  "target_mid_low": 0.00,
+  "target_mid_high": 0.00,
+  "risk_level": "Düşük/Orta/Yüksek",
+  "thesis_summary": "Tez özeti."
+}
+\`\`\``;
   return callAgent('US', 'manager', prompt, 2000);
 }
 
