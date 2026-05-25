@@ -1,7 +1,8 @@
 import React from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, FileText, Search, Users, Bot, SlidersHorizontal, DollarSign, BarChart2, LogOut, TrendingUp, X } from 'lucide-react'
+import { LayoutDashboard, FileText, Search, Users, Bot, SlidersHorizontal, DollarSign, BarChart2, LogOut, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import Logo from './Logo'
 
 const navItem = (to, Icon, label) => (
   <NavLink
@@ -36,16 +37,10 @@ export default function Sidebar({ isOpen, onClose }) {
       `}
     >
       <div className="p-5 border-b border-white/5 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <TrendingUp size={22} className="text-teal-400" />
-          <div>
-            <span className="text-xl font-bold text-white">Getafix</span>
-            <p className="text-xs text-slate-500 leading-none mt-0.5">AI Market Forecast</p>
-          </div>
-        </div>
+        <Logo size="sm" theme="dark" />
         <button
           onClick={onClose}
-          className="lg:hidden text-slate-500 hover:text-white transition-colors"
+          className="lg:hidden text-slate-500 hover:text-white transition-colors ml-2"
         >
           <X size={18} />
         </button>

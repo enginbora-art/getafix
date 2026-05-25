@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
-import { Menu, TrendingUp } from 'lucide-react'
+import { Menu } from 'lucide-react'
 import Sidebar from './Sidebar'
+import Logo from './Logo'
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -31,10 +32,7 @@ export default function Layout() {
           >
             <Menu size={22} />
           </button>
-          <div className="flex items-center gap-2">
-            <TrendingUp size={18} className="text-teal-400" />
-            <span className="text-white font-bold text-lg">Getafix</span>
-          </div>
+          <Logo size="xs" theme="dark" />
         </div>
         <Outlet />
       </main>

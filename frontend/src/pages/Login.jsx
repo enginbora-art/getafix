@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { TrendingUp, Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import Logo from '../components/Logo'
 
 const cauldronStyles = `
   @keyframes bup  {0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.5);opacity:0}}
@@ -175,13 +176,9 @@ export default function Login() {
       >
         <div className="w-full max-w-sm">
           {/* Logo */}
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-teal-600/20 border border-teal-500/30 flex items-center justify-center shrink-0">
-              <TrendingUp size={20} className="text-teal-400" />
-            </div>
-            <span className="text-2xl font-bold text-white">Getafix</span>
+          <div className="mb-8">
+            <Logo size="md" theme="dark" showTagline={true} />
           </div>
-          <p className="text-slate-500 text-sm mb-8 pl-[52px]">AI Destekli Borsa Forecast</p>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">

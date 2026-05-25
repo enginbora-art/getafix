@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
-import { TrendingUp, CheckCircle, Circle } from 'lucide-react'
+import { CheckCircle, Circle } from 'lucide-react'
 import api from '../lib/api'
+import Logo from '../components/Logo'
 
 const rules = [
   { label: 'En az 8 karakter', test: (p) => p.length >= 8 },
@@ -51,14 +52,9 @@ export default function ResetPassword() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0a0f1e] p-4">
       <div className="w-full max-w-sm">
-        {/* Logo */}
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl bg-teal-600/20 border border-teal-500/30 flex items-center justify-center shrink-0">
-            <TrendingUp size={20} className="text-teal-400" />
-          </div>
-          <span className="text-2xl font-bold text-white">Getafix</span>
+        <div className="mb-8">
+          <Logo size="md" theme="dark" showTagline={true} />
         </div>
-        <p className="text-slate-500 text-sm mb-8 pl-[52px]">AI Destekli Borsa Forecast</p>
 
         <div className="bg-white/5 border border-white/10 rounded-2xl p-8">
           <h1 className="text-xl font-bold text-white mb-1">
