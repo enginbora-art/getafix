@@ -1,6 +1,6 @@
 import React from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, FileText, Search, Users, Bot, SlidersHorizontal, DollarSign, LogOut, TrendingUp } from 'lucide-react'
+import { LayoutDashboard, FileText, Search, Users, Bot, SlidersHorizontal, DollarSign, BarChart2, LogOut, TrendingUp } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const navItem = (to, Icon, label) => (
@@ -38,6 +38,7 @@ export default function Sidebar() {
 
       <nav className="flex-1 p-4 space-y-1">
         {navItem('/dashboard', LayoutDashboard, 'Dashboard')}
+        {navItem('/portfolio', BarChart2, 'Genel Tablo')}
         {navItem('/reports', FileText, 'Raporlar')}
         {navItem('/analysis', Search, 'Manuel Analiz')}
 

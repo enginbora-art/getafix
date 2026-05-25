@@ -402,7 +402,7 @@ Raporun TAMAMEN SONUNA şu JSON bloğunu ekle (kullanıcıya gösterilmeyecek):
 }
 
 async function runManualAnalysis(ticker, onStep = null, context = {}) {
-  const { userId, requestId } = context;
+  const { userId, requestId, scenario } = context;
   const todayStr = new Date().toISOString().split('T')[0];
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
@@ -448,7 +448,11 @@ async function runManualAnalysis(ticker, onStep = null, context = {}) {
   const sum1 = summarizeForPeer(r2tech.text, 1200);
   const sum2 = summarizeForPeer(r2fund.text, 1200);
   const sum3 = summarizeForPeer(r1sent.text, 1200);
-  const rManager = await callAgent('US', 'manager', buildUsManagerPrompt([ticker], segmentContext, sum1, sum2, sum3, stockBlock, todayStr), 3000);
+  let managerPrompt = buildUsManagerPrompt([ticker], segmentContext, sum1, sum2, sum3, stockBlock, todayStr);
+  if (scenario) {
+    managerPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━\nKULLANICI SENARYOSU — Bu senaryoyu analizine dahil et:\n"${scenario}"\nBu senaryo doğruysa nasıl bir etki olur? Pozisyonu etkiler mi? Açıkça belirt.\n━━━━━━━━━━━━━━━━━━━━━━`;
+  }
+  const rManager = await callAgent('US', 'manager', managerPrompt, 3000);
   totalInputTokens += rManager.inputTokens; totalOutputTokens += rManager.outputTokens;
   await logUsage({ userId, requestType: 'manual', market: 'US', agentName: 'manager', inputTokens: rManager.inputTokens, outputTokens: rManager.outputTokens, ticker });
 

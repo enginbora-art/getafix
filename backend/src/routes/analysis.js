@@ -50,7 +50,7 @@ router.get('/requests', authMiddleware, async (req, res) => {
 // POST /api/analysis/request
 router.post('/request', authMiddleware, async (req, res) => {
   try {
-    const { market, ticker } = req.body;
+    const { market, ticker, scenario } = req.body;
     if (!market || !ticker) return res.status(400).json({ error: 'Market ve ticker zorunlu' });
     if (!['BIST', 'US'].includes(market)) return res.status(400).json({ error: 'Geçersiz market' });
 
@@ -80,8 +80,9 @@ router.post('/request', authMiddleware, async (req, res) => {
 
     const status = hasActive > 0 ? 'QUEUED' : 'PENDING';
 
+    const scenarioClean = typeof scenario === 'string' ? scenario.trim().slice(0, 500) || null : null;
     const request = await prisma.manualRequest.create({
-      data: { userId: req.user.id, market, ticker: tickerUpper, status },
+      data: { userId: req.user.id, market, ticker: tickerUpper, status, scenario: scenarioClean },
     });
 
     if (status === 'PENDING') {
@@ -129,7 +130,7 @@ async function processManualRequest(requestId) {
         : require('../services/forecast/us');
 
     const onStep = (step) => updateStep(requestId, step);
-    const { result, currentPrice } = await runManualAnalysis(req.ticker, onStep, { userId, requestId });
+    const { result, currentPrice } = await runManualAnalysis(req.ticker, onStep, { userId, requestId, scenario: req.scenario });
 
     await prisma.manualRequest.update({
       where: { id: requestId },

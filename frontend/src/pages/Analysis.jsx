@@ -26,13 +26,15 @@ const STATUS_CONFIG = {
 
 function MarketForm({ market, label, placeholder }) {
   const [ticker, setTicker] = useState('')
+  const [scenario, setScenario] = useState('')
   const [tickerError, setTickerError] = useState(null)
   const qc = useQueryClient()
 
   const { mutate: sendRequest, isPending } = useMutation({
-    mutationFn: () => api.post('/analysis/request', { market, ticker: ticker.trim() }),
+    mutationFn: () => api.post('/analysis/request', { market, ticker: ticker.trim(), scenario: scenario.trim() || undefined }),
     onSuccess: () => {
       setTicker('')
+      setScenario('')
       setTickerError(null)
       qc.invalidateQueries({ queryKey: ['analysis-requests'] })
     },
@@ -66,6 +68,20 @@ function MarketForm({ market, label, placeholder }) {
           {tickerError && (
             <p className="text-red-400 text-sm mt-1.5">⚠️ {tickerError}</p>
           )}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-400 mb-1.5">
+            Senaryo / Ek Bağlam <span className="text-slate-600 font-normal">(opsiyonel)</span>
+          </label>
+          <textarea
+            value={scenario}
+            onChange={(e) => setScenario(e.target.value)}
+            placeholder="Örn: Hürmüz Boğazı barış süreci etkisini değerlendir..."
+            rows={3}
+            maxLength={500}
+            className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-slate-100 placeholder-slate-600 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 resize-none text-sm"
+          />
+          <p className="text-xs text-slate-600 text-right mt-1">{scenario.length}/500</p>
         </div>
         <button
           type="submit"

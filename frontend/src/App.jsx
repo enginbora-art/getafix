@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard'
 import Reports from './pages/Reports'
 import Analysis from './pages/Analysis'
 import ChangePassword from './pages/ChangePassword'
+import Portfolio from './pages/Portfolio'
 import AdminUsers from './pages/admin/Users'
 import AdminAgents from './pages/admin/Agents'
 import AdminCriteria from './pages/admin/Criteria'
@@ -23,6 +24,7 @@ export default function App() {
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/reports/:id" element={<Reports />} />
             <Route path="/analysis" element={<Analysis />} />

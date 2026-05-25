@@ -331,7 +331,7 @@ Raporun TAMAMEN SONUNA (raporun dışına) şu JSON bloğunu ekle — bu blok ku
 }
 
 async function runManualAnalysis(ticker, onStep = null, context = {}) {
-  const { userId, requestId } = context;
+  const { userId, requestId, scenario } = context;
   const tickerYf = `${ticker}.IS`;
   const dateStr = new Date().toLocaleDateString('tr-TR');
   let totalInputTokens = 0;
@@ -372,7 +372,11 @@ async function runManualAnalysis(ticker, onStep = null, context = {}) {
   ]);
 
   await onStep?.('Yönetici sentez yapıyor...');
-  const rManager = await callAgent('BIST', 'manager', buildManagerPrompt(r2tech.text, r2fund.text, r1sent.text, dateStr, [ticker]), 3000);
+  let managerPrompt = buildManagerPrompt(r2tech.text, r2fund.text, r1sent.text, dateStr, [ticker]);
+  if (scenario) {
+    managerPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━\nKULLANICI SENARYOSU — Bu senaryoyu analizine dahil et:\n"${scenario}"\nBu senaryo doğruysa nasıl bir etki olur? Pozisyonu etkiler mi? Açıkça belirt.\n━━━━━━━━━━━━━━━━━━━━━━`;
+  }
+  const rManager = await callAgent('BIST', 'manager', managerPrompt, 3000);
   totalInputTokens += rManager.inputTokens; totalOutputTokens += rManager.outputTokens;
   await logUsage({ userId, requestType: 'manual', market: 'BIST', agentName: 'manager', inputTokens: rManager.inputTokens, outputTokens: rManager.outputTokens, ticker });
 

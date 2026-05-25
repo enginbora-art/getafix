@@ -46,6 +46,87 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/reports/portfolio
+router.get('/portfolio', authMiddleware, async (req, res) => {
+  try {
+    const yf = require('../lib/yf');
+    const since = new Date(Date.now() - 30 * 24 * 3600 * 1000);
+
+    const reports = await prisma.report.findMany({
+      where: { createdAt: { gte: since }, ticker: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true, market: true, createdAt: true, ticker: true,
+        entryLow: true, entryHigh: true, stopLoss: true,
+        targetShort: true, targetMid: true, riskLevel: true, content: true,
+      },
+    });
+
+    // Keep only the latest report per ticker
+    const seen = new Set();
+    const unique = reports.filter((r) => {
+      if (seen.has(r.ticker)) return false;
+      seen.add(r.ticker);
+      return true;
+    });
+
+    const parseBias = (content) => {
+      const m = content?.match(/##\s*⚡\s*KARAR:\s*(AL|SAT|BEKLE)/i);
+      return m?.[1]?.toUpperCase() || null;
+    };
+
+    const withPrices = await Promise.allSettled(
+      unique.map(async (r) => {
+        const symbol = r.market === 'BIST' ? `${r.ticker}.IS` : r.ticker;
+        try {
+          const quote = await yf.quote(symbol, { fields: ['regularMarketPrice'] });
+          return { ...r, currentPrice: quote.regularMarketPrice ?? null };
+        } catch {
+          return { ...r, currentPrice: null };
+        }
+      }),
+    );
+
+    const positions = withPrices.map((result) => {
+      const r = result.status === 'fulfilled' ? result.value : { ...result.value, currentPrice: null };
+
+      const entryPrice =
+        r.entryLow != null && r.entryHigh != null
+          ? (r.entryLow + r.entryHigh) / 2
+          : (r.entryLow ?? r.entryHigh ?? null);
+
+      const returnShort =
+        entryPrice && r.currentPrice != null
+          ? parseFloat(((r.currentPrice - entryPrice) / entryPrice * 100).toFixed(2))
+          : null;
+
+      const returnVsT1 =
+        entryPrice && r.targetShort != null
+          ? parseFloat(((r.targetShort - entryPrice) / entryPrice * 100).toFixed(2))
+          : null;
+
+      return {
+        ticker: r.ticker,
+        market: r.market,
+        reportDate: r.createdAt,
+        bias: parseBias(r.content),
+        entryPrice,
+        target1: r.targetShort,
+        target2: r.targetMid,
+        stopLoss: r.stopLoss,
+        riskLevel: r.riskLevel,
+        currentPrice: r.currentPrice ?? null,
+        returnShort,
+        returnVsT1,
+      };
+    });
+
+    res.json({ positions });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/reports/:id
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
