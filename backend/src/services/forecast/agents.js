@@ -112,8 +112,10 @@ async function callAgent(market, agentName, userMessage, maxTokens = 1500) {
       const status = err.status || 0;
       if (attempt < 3 && (status === 429 || status === 529)) {
         const wait = status === 429 ? 65000 : 30000 * (attempt + 1);
+        console.warn(`[callAgent] ${market}/${agentName} — HTTP ${status}, ${wait / 1000}s bekleniyor... (deneme ${attempt + 1}/4)`);
         await new Promise((r) => setTimeout(r, wait));
       } else {
+        console.error(`[callAgent] ${market}/${agentName} — HATA (deneme ${attempt + 1}/4): ${err.message}`);
         throw err;
       }
     }
@@ -123,19 +125,24 @@ async function callAgent(market, agentName, userMessage, maxTokens = 1500) {
 async function callAgentWithWebSearch(market, agentName, userMessage) {
   const system = await getPrompt(market, agentName);
 
-  const msg = await client.messages.create({
-    model: MODEL,
-    max_tokens: 1500,
-    system,
-    messages: [{ role: 'user', content: userMessage }],
-    tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
-  });
-  const text = msg.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
-  return {
-    text,
-    inputTokens: msg.usage?.input_tokens || 0,
-    outputTokens: msg.usage?.output_tokens || 0,
-  };
+  try {
+    const msg = await client.messages.create({
+      model: MODEL,
+      max_tokens: 1500,
+      system,
+      messages: [{ role: 'user', content: userMessage }],
+      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
+    });
+    const text = msg.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
+    return {
+      text,
+      inputTokens: msg.usage?.input_tokens || 0,
+      outputTokens: msg.usage?.output_tokens || 0,
+    };
+  } catch (err) {
+    console.error(`[callAgentWithWebSearch] ${market}/${agentName} — HATA: ${err.message}`);
+    throw err;
+  }
 }
 
 function summarizeForPeer(text, maxChars = 1200) {

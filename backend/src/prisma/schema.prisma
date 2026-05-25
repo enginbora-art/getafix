@@ -114,6 +114,7 @@ model SystemRun {
   status      String    @default("RUNNING")
   startedAt   DateTime  @default(now())
   endedAt     DateTime?
+  duration    Int?
   error       String?
   userId      String?
   user        User?     @relation(fields: [userId], references: [id])

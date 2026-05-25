@@ -85,11 +85,17 @@ async function fetchSpyReturns() {
   }
 }
 
-async function batchedFetch(items, fetchFn, batchSize = 10) {
+async function batchedFetch(items, fetchFn, batchSize = 10, label = '') {
   const results = [];
   for (let i = 0; i < items.length; i += batchSize) {
     const batch = items.slice(i, i + batchSize);
     const batchResults = await Promise.allSettled(batch.map(fetchFn));
+    const failures = batchResults
+      .map((r, idx) => r.status === 'rejected' ? `${batch[idx]}(${r.reason?.message || r.reason})` : null)
+      .filter(Boolean);
+    if (failures.length > 0) {
+      console.warn(`[batchedFetch${label ? ':' + label : ''}] Batch ${Math.floor(i / batchSize) + 1} — ${failures.length} hata: ${failures.join(', ')}`);
+    }
     results.push(...batchResults);
     if (i + batchSize < items.length) {
       await new Promise((r) => setTimeout(r, 500));
@@ -152,7 +158,7 @@ async function fetchTechnicalSnapshot(tickers) {
         volume_trend: vol5 > vol20 * 1.1 ? 'artan' : vol5 < vol20 * 0.9 ? 'azalan' : 'yatay',
       },
     };
-  });
+  }, 10, 'US-teknik');
 
   const result = {};
   for (const r of results) {
@@ -195,7 +201,7 @@ async function fetchFundamentalSnapshot(tickers) {
         debt_to_equity: safe(fd.debtToEquity),
       },
     };
-  });
+  }, 10, 'US-temel');
 
   const result = {};
   for (const r of results) {
@@ -252,18 +258,27 @@ function buildUsSentPrompt(stockBlock, todayStr) {
 async function runUsForecast(isClosing = false) {
   const now = new Date();
   const todayStr = now.toISOString().split('T')[0];
+  const t0 = Date.now();
   console.log(`[US] Forecast başladı — ${todayStr} isClosing=${isClosing}`);
+  console.log(`[US] Watchlist yüklendi: ${US_WATCHLIST.length} hisse`);
 
   const filters = await getUsFilters();
   const spyReturns = await fetchSpyReturns();
 
   console.log('[US] Teknik veri çekiliyor...');
   const techFull = await fetchTechnicalSnapshot(US_WATCHLIST);
+  const techSuccess = Object.keys(techFull).length;
+  const techFail = US_WATCHLIST.length - techSuccess;
+  console.log(`[US] Teknik veri tamamlandı: ${techSuccess} başarılı, ${techFail} hata`);
+
   console.log('[US] Temel veri çekiliyor...');
   const fundFull = await fetchFundamentalSnapshot(Object.keys(techFull));
+  const fundSuccess = Object.keys(fundFull).length;
+  const fundFail = techSuccess - fundSuccess;
+  console.log(`[US] Temel veri tamamlandı: ${fundSuccess} başarılı, ${fundFail} hata`);
 
   const { candidates, segmentContext } = prefilterUs(techFull, fundFull, spyReturns, filters);
-  console.log(`[US] Adaylar: ${candidates.join(', ')}`);
+  console.log(`[US] Prefilter: top ${candidates.length} hisse seçildi — ${candidates.join(', ')}`);
 
   const stockBlock = compressForAgent(
     Object.fromEntries(candidates.map((t) => [t, techFull[t]])),
@@ -271,35 +286,40 @@ async function runUsForecast(isClosing = false) {
     spyReturns,
   );
 
-  console.log('[US] Ajanlar çalışıyor...');
-  const [r1tech, r1fund, r1sent] = await Promise.all([
-    callAgent('US', 'technical', buildUsTechPrompt(stockBlock, todayStr), 2500),
-    callAgent('US', 'fundamental', buildUsFundPrompt(stockBlock, todayStr), 2500),
-    callAgentWithWebSearch('US', 'sentiment', buildUsSentPrompt(stockBlock, todayStr)),
-  ]);
-  await Promise.all([
-    logUsage({ requestType: 'scheduled', market: 'US', agentName: 'technical', inputTokens: r1tech.inputTokens, outputTokens: r1tech.outputTokens }),
-    logUsage({ requestType: 'scheduled', market: 'US', agentName: 'fundamental', inputTokens: r1fund.inputTokens, outputTokens: r1fund.outputTokens }),
-    logUsage({ requestType: 'scheduled', market: 'US', agentName: 'sentiment', inputTokens: r1sent.inputTokens, outputTokens: r1sent.outputTokens }),
-  ]);
+  console.log('[US] Ajan 1 (teknik) başlıyor...');
+  const r1tech = await callAgent('US', 'technical', buildUsTechPrompt(stockBlock, todayStr), 2500);
+  console.log(`[US] Ajan 1 (teknik) tamamlandı (${r1tech.inputTokens} in / ${r1tech.outputTokens} out token)`);
+  await logUsage({ requestType: 'scheduled', market: 'US', agentName: 'technical', inputTokens: r1tech.inputTokens, outputTokens: r1tech.outputTokens });
 
-  console.log('[US] Tartışma turu...');
+  console.log('[US] Ajan 2 (temel) başlıyor...');
+  const r1fund = await callAgent('US', 'fundamental', buildUsFundPrompt(stockBlock, todayStr), 2500);
+  console.log(`[US] Ajan 2 (temel) tamamlandı (${r1fund.inputTokens} in / ${r1fund.outputTokens} out token)`);
+  await logUsage({ requestType: 'scheduled', market: 'US', agentName: 'fundamental', inputTokens: r1fund.inputTokens, outputTokens: r1fund.outputTokens });
+
+  console.log('[US] Ajan 3 (sentiment/web) başlıyor...');
+  const r1sent = await callAgentWithWebSearch('US', 'sentiment', buildUsSentPrompt(stockBlock, todayStr));
+  console.log(`[US] Ajan 3 (sentiment/web) tamamlandı (${r1sent.inputTokens} in / ${r1sent.outputTokens} out token)`);
+  await logUsage({ requestType: 'scheduled', market: 'US', agentName: 'sentiment', inputTokens: r1sent.inputTokens, outputTokens: r1sent.outputTokens });
+
+  console.log('[US] Tartışma turu başlıyor...');
   const [r2tech, r2fund] = await Promise.all([
     callAgent('US', 'technical', buildUsTechPrompt(stockBlock, todayStr) + `\n\nOTHER ANALYSTS' VIEWS:\n[Fundamental]\n${summarizeForPeer(r1fund.text)}\n\n[Sentiment]\n${summarizeForPeer(r1sent.text)}\n\nUpdate your assessment considering these views. Reinforce agreements, clarify disagreements with technical rationale.`, 2500),
     callAgent('US', 'fundamental', buildUsFundPrompt(stockBlock, todayStr) + `\n\nOTHER ANALYSTS' VIEWS:\n[Technical]\n${summarizeForPeer(r1tech.text)}\n\n[Sentiment]\n${summarizeForPeer(r1sent.text)}\n\nIf technical looks good but fundamentals are weak, say so clearly. And vice versa.`, 2500),
   ]);
+  console.log(`[US] Tartışma turu tamamlandı (teknik: ${r2tech.outputTokens} / temel: ${r2fund.outputTokens} out token)`);
   await Promise.all([
     logUsage({ requestType: 'scheduled', market: 'US', agentName: 'technical_peer', inputTokens: r2tech.inputTokens, outputTokens: r2tech.outputTokens }),
     logUsage({ requestType: 'scheduled', market: 'US', agentName: 'fundamental_peer', inputTokens: r2fund.inputTokens, outputTokens: r2fund.outputTokens }),
   ]);
 
-  console.log('[US] Yönetici sentez yapıyor...');
   const sum1 = summarizeForPeer(r2tech.text, 1200);
   const sum2 = summarizeForPeer(r2fund.text, 1200);
   const sum3 = summarizeForPeer(r1sent.text, 1200);
 
   const managerPrompt = buildUsManagerPrompt(candidates, segmentContext, sum1, sum2, sum3, stockBlock, todayStr);
+  console.log('[US] Yönetici sentez başlıyor...');
   const rManager = await callAgent('US', 'manager', managerPrompt, 3000);
+  console.log(`[US] Yönetici sentez tamamlandı (${rManager.inputTokens} in / ${rManager.outputTokens} out token)`);
   await logUsage({ requestType: 'scheduled', market: 'US', agentName: 'manager', inputTokens: rManager.inputTokens, outputTokens: rManager.outputTokens });
 
   const managerOut = rManager.text;
@@ -321,9 +341,10 @@ async function runUsForecast(isClosing = false) {
       isClosing,
     },
   });
+  console.log(`[US] Rapor kaydedildi — ID: ${report.id}`);
 
   await sendForecastEmail(managerOut, 'US', now);
-  console.log(`[US] Tamamlandı. Report ID: ${report.id}`);
+  console.log(`[US] Tamamlandı — toplam süre: ${Math.round((Date.now() - t0) / 1000)}s`);
   return managerOut;
 }
 

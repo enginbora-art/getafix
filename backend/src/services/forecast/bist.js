@@ -39,11 +39,17 @@ function computeRsi(prices, period = 14) {
   return Math.round((100 - 100 / (1 + rs)) * 10) / 10;
 }
 
-async function batchedFetch(items, fetchFn, batchSize = 10) {
+async function batchedFetch(items, fetchFn, batchSize = 10, label = '') {
   const results = [];
   for (let i = 0; i < items.length; i += batchSize) {
     const batch = items.slice(i, i + batchSize);
     const batchResults = await Promise.allSettled(batch.map(fetchFn));
+    const failures = batchResults
+      .map((r, idx) => r.status === 'rejected' ? `${batch[idx]}(${r.reason?.message || r.reason})` : null)
+      .filter(Boolean);
+    if (failures.length > 0) {
+      console.warn(`[batchedFetch${label ? ':' + label : ''}] Batch ${Math.floor(i / batchSize) + 1} — ${failures.length} hata: ${failures.join(', ')}`);
+    }
     results.push(...batchResults);
     if (i + batchSize < items.length) {
       await new Promise((r) => setTimeout(r, 500));
@@ -91,7 +97,7 @@ async function fetchTechnicalSnapshot(tickers) {
         volume_trend: vol5 > vol20 * 1.1 ? 'artan' : vol5 < vol20 * 0.9 ? 'azalan' : 'yatay',
       },
     };
-  });
+  }, 10, 'BIST-teknik');
 
   const snapshot = {};
   for (const r of results) {
@@ -128,7 +134,7 @@ async function fetchFundamentalSnapshot(tickers) {
         roe_pct: fd.returnOnEquity ? fd.returnOnEquity * 100 : null,
       },
     };
-  });
+  }, 10, 'BIST-temel');
 
   const snapshot = {};
   for (const r of results) {
@@ -180,58 +186,67 @@ function buildSentPrompt(codes, dateStr) {
 
 async function runBistForecast(isClosing = false) {
   const now = new Date();
+  const t0 = Date.now();
   console.log(`[BIST] Forecast başladı — ${now.toISOString()} isClosing=${isClosing}`);
+  console.log(`[BIST] Watchlist yüklendi: ${BIST_WATCHLIST.length} hisse`);
 
   const filters = await getBistFilters();
 
   console.log('[BIST] Teknik veri çekiliyor...');
   const techFull = await fetchTechnicalSnapshot(BIST_WATCHLIST);
+  const techSuccess = Object.keys(techFull).length;
+  const techFail = BIST_WATCHLIST.length - techSuccess;
+  console.log(`[BIST] Teknik veri tamamlandı: ${techSuccess} başarılı, ${techFail} hata`);
+
   console.log('[BIST] Temel veri çekiliyor...');
   const fundFull = await fetchFundamentalSnapshot(BIST_WATCHLIST);
+  const fundSuccess = Object.keys(fundFull).length;
+  const fundFail = BIST_WATCHLIST.length - fundSuccess;
+  console.log(`[BIST] Temel veri tamamlandı: ${fundSuccess} başarılı, ${fundFail} hata`);
 
   const candidates = prefilterBist(techFull, fundFull, filters);
-  console.log(`[BIST] Adaylar: ${candidates.join(', ')}`);
+  console.log(`[BIST] Prefilter: top ${candidates.length} hisse seçildi — ${candidates.map((t) => t.replace('.IS', '')).join(', ')}`);
 
-  const techData = compressForAgent(
-    Object.fromEntries(candidates.filter((t) => techFull[t]).map((t) => [t, techFull[t]])),
-    Object.fromEntries(candidates.filter((t) => fundFull[t]).map((t) => [t, fundFull[t]])),
-  );
-  const fundData = compressForAgent(
-    Object.fromEntries(candidates.filter((t) => techFull[t]).map((t) => [t, techFull[t]])),
-    Object.fromEntries(candidates.filter((t) => fundFull[t]).map((t) => [t, fundFull[t]])),
-  );
+  const candidateTech = Object.fromEntries(candidates.filter((t) => techFull[t]).map((t) => [t, techFull[t]]));
+  const candidateFund = Object.fromEntries(candidates.filter((t) => fundFull[t]).map((t) => [t, fundFull[t]]));
+  const agentData = compressForAgent(candidateTech, candidateFund);
 
   const dateStr = now.toLocaleDateString('tr-TR');
   const bistCodes = candidates.map((t) => t.replace('.IS', ''));
-  const techPrompt = buildTechPrompt(techData, dateStr);
-  const fundPrompt = buildFundPrompt(fundData, dateStr);
+  const techPrompt = buildTechPrompt(agentData, dateStr);
+  const fundPrompt = buildFundPrompt(agentData, dateStr);
   const sentPrompt = buildSentPrompt(bistCodes, dateStr);
 
-  console.log('[BIST] Ajanlar çalışıyor...');
-  const [r1tech, r1fund, r1sent] = await Promise.all([
-    callAgent('BIST', 'technical', techPrompt),
-    callAgent('BIST', 'fundamental', fundPrompt),
-    callAgentWithWebSearch('BIST', 'sentiment', sentPrompt),
-  ]);
-  await Promise.all([
-    logUsage({ requestType: 'scheduled', market: 'BIST', agentName: 'technical', inputTokens: r1tech.inputTokens, outputTokens: r1tech.outputTokens }),
-    logUsage({ requestType: 'scheduled', market: 'BIST', agentName: 'fundamental', inputTokens: r1fund.inputTokens, outputTokens: r1fund.outputTokens }),
-    logUsage({ requestType: 'scheduled', market: 'BIST', agentName: 'sentiment', inputTokens: r1sent.inputTokens, outputTokens: r1sent.outputTokens }),
-  ]);
+  console.log('[BIST] Ajan 1 (teknik) başlıyor...');
+  const r1tech = await callAgent('BIST', 'technical', techPrompt);
+  console.log(`[BIST] Ajan 1 (teknik) tamamlandı (${r1tech.inputTokens} in / ${r1tech.outputTokens} out token)`);
+  await logUsage({ requestType: 'scheduled', market: 'BIST', agentName: 'technical', inputTokens: r1tech.inputTokens, outputTokens: r1tech.outputTokens });
 
-  console.log('[BIST] Tartışma turu...');
+  console.log('[BIST] Ajan 2 (temel) başlıyor...');
+  const r1fund = await callAgent('BIST', 'fundamental', fundPrompt);
+  console.log(`[BIST] Ajan 2 (temel) tamamlandı (${r1fund.inputTokens} in / ${r1fund.outputTokens} out token)`);
+  await logUsage({ requestType: 'scheduled', market: 'BIST', agentName: 'fundamental', inputTokens: r1fund.inputTokens, outputTokens: r1fund.outputTokens });
+
+  console.log('[BIST] Ajan 3 (sentiment/web) başlıyor...');
+  const r1sent = await callAgentWithWebSearch('BIST', 'sentiment', sentPrompt);
+  console.log(`[BIST] Ajan 3 (sentiment/web) tamamlandı (${r1sent.inputTokens} in / ${r1sent.outputTokens} out token)`);
+  await logUsage({ requestType: 'scheduled', market: 'BIST', agentName: 'sentiment', inputTokens: r1sent.inputTokens, outputTokens: r1sent.outputTokens });
+
+  console.log('[BIST] Tartışma turu başlıyor...');
   const [r2tech, r2fund] = await Promise.all([
     callAgent('BIST', 'technical', techPrompt + `\n\nDİĞER AJANLARIN GÖRÜŞLERİ:\n[Temel analist özeti]\n${summarizeForPeer(r1fund.text)}\n\n[Sentiment özeti]\n${summarizeForPeer(r1sent.text)}\n\nBu görüşleri okuyup değerlendirmeni güncelle. Çelişkili noktalarda teknik gerekçeni daha net koy, ortak görüşte pekiştir.`),
     callAgent('BIST', 'fundamental', fundPrompt + `\n\nDİĞER AJANLARIN GÖRÜŞLERİ:\n[Teknik analist özeti]\n${summarizeForPeer(r1tech.text)}\n\n[Sentiment özeti]\n${summarizeForPeer(r1sent.text)}\n\nTeknik tablo iyi ama temelde zayıf bir kağıt varsa açıkça belirt. Tersi de geçerli.`),
   ]);
+  console.log(`[BIST] Tartışma turu tamamlandı (teknik: ${r2tech.outputTokens} / temel: ${r2fund.outputTokens} out token)`);
   await Promise.all([
     logUsage({ requestType: 'scheduled', market: 'BIST', agentName: 'technical_peer', inputTokens: r2tech.inputTokens, outputTokens: r2tech.outputTokens }),
     logUsage({ requestType: 'scheduled', market: 'BIST', agentName: 'fundamental_peer', inputTokens: r2fund.inputTokens, outputTokens: r2fund.outputTokens }),
   ]);
 
   const managerPrompt = buildManagerPrompt(r2tech.text, r2fund.text, r1sent.text, dateStr, bistCodes);
-  console.log('[BIST] Yönetici sentez yapıyor...');
+  console.log('[BIST] Yönetici sentez başlıyor...');
   const rManager = await callAgent('BIST', 'manager', managerPrompt, 3000);
+  console.log(`[BIST] Yönetici sentez tamamlandı (${rManager.inputTokens} in / ${rManager.outputTokens} out token)`);
   await logUsage({ requestType: 'scheduled', market: 'BIST', agentName: 'manager', inputTokens: rManager.inputTokens, outputTokens: rManager.outputTokens });
 
   const finalReport = rManager.text;
@@ -253,9 +268,10 @@ async function runBistForecast(isClosing = false) {
       isClosing,
     },
   });
+  console.log(`[BIST] Rapor kaydedildi — ID: ${report.id}`);
 
   await sendForecastEmail(finalReport, 'BIST', now);
-  console.log(`[BIST] Tamamlandı. Report ID: ${report.id}`);
+  console.log(`[BIST] Tamamlandı — toplam süre: ${Math.round((Date.now() - t0) / 1000)}s`);
   return finalReport;
 }
 

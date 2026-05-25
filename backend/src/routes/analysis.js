@@ -194,17 +194,21 @@ router.post('/run-system', authMiddleware, async (req, res) => {
     const { runUsForecast } = require('../services/forecast/us');
     const run = market === 'BIST' ? runBistForecast : runUsForecast;
 
-    run(true).then(() =>
-      prisma.systemRun.update({
+    run(true).then(() => {
+      const endedAt = new Date();
+      const duration = Math.round((endedAt.getTime() - new Date(systemRun.startedAt).getTime()) / 1000);
+      return prisma.systemRun.update({
         where: { id: systemRun.id },
-        data: { status: 'DONE', endedAt: new Date() },
-      })
-    ).catch((err) =>
-      prisma.systemRun.update({
+        data: { status: 'DONE', endedAt, duration },
+      });
+    }).catch((err) => {
+      const endedAt = new Date();
+      const duration = Math.round((endedAt.getTime() - new Date(systemRun.startedAt).getTime()) / 1000);
+      return prisma.systemRun.update({
         where: { id: systemRun.id },
-        data: { status: 'FAILED', error: err.message, endedAt: new Date() },
-      })
-    );
+        data: { status: 'FAILED', error: err.message, endedAt, duration },
+      });
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -226,10 +230,8 @@ router.get('/system-status', authMiddleware, async (req, res) => {
 
     if (!run) return res.json({ status: null });
 
-    const duration =
-      run.endedAt
-        ? Math.round((new Date(run.endedAt) - new Date(run.startedAt)) / 1000)
-        : null;
+    const duration = run.duration ??
+      (run.endedAt ? Math.round((new Date(run.endedAt) - new Date(run.startedAt)) / 1000) : null);
 
     res.json({
       status: run.status,
