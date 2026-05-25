@@ -18,32 +18,15 @@ function BiasTag({ bias }) {
   )
 }
 
-function H1Cell({ value }) {
+function ReturnCell({ value }) {
   if (value == null) return <span className="text-slate-500">—</span>
   if (value > 0) return <span className="text-green-400 font-medium">+{value}%</span>
-  return <span className="text-slate-500 font-medium">{value}%</span>
-}
-
-function H2Cell({ value }) {
-  if (value == null) return <span className="text-slate-500">—</span>
-  if (value > 0) return <span className="text-teal-400 font-medium">+{value}%</span>
-  return <span className="text-slate-500 font-medium">{value}%</span>
+  return <span className="text-red-400 font-medium">{value}%</span>
 }
 
 function PriceCell({ value, currency }) {
   if (value == null) return <span className="text-slate-500">—</span>
   return <span className="text-slate-200">{value.toFixed(2)} {currency}</span>
-}
-
-function Tooltip({ text }) {
-  return (
-    <span
-      className="ml-1 text-slate-600 cursor-help"
-      title={text}
-    >
-      ℹ
-    </span>
-  )
 }
 
 export default function Portfolio() {
@@ -167,14 +150,7 @@ export default function Portfolio() {
                   <th className="text-right px-4 py-3">H1 (Kısa)</th>
                   <th className="text-right px-4 py-3">H2 (Orta)</th>
                   <th className="text-right px-4 py-3">Güncel</th>
-                  <th className="text-right px-4 py-3">
-                    H1 Potansiyel
-                    <Tooltip text="Güncel fiyattan H1 hedefine kalan %" />
-                  </th>
-                  <th className="text-right px-4 py-3">
-                    H2 Potansiyel
-                    <Tooltip text="Güncel fiyattan H2 hedefine kalan %" />
-                  </th>
+                  <th className="text-right px-4 py-3">Getiri %</th>
                 </tr>
               </thead>
               <tbody>
@@ -196,7 +172,7 @@ export default function Portfolio() {
                         <BiasTag bias={p.bias} />
                       </td>
 
-                      {/* Editable entry price cell */}
+                      {/* Editable entry price */}
                       <td className="px-4 py-3 text-right">
                         {isEditing ? (
                           <div className="flex items-center justify-end gap-1">
@@ -252,10 +228,7 @@ export default function Portfolio() {
                         <PriceCell value={p.currentPrice} currency={currency} />
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <H1Cell value={p.returnShort} />
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <H2Cell value={p.returnMid} />
+                        <ReturnCell value={p.returnPct} />
                       </td>
                     </tr>
                   )

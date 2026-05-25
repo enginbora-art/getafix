@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Download, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Download, ArrowLeft, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import api from '../lib/api'
 import ReportCard from '../components/ReportCard'
 
@@ -13,17 +13,28 @@ function stripJsonBlocks(content) {
 
 function ReportDetail({ id }) {
   const navigate = useNavigate()
+  const [dlState, setDlState] = useState(null) // null | 'loading' | 'done'
+
   const { data: report, isLoading } = useQuery({
     queryKey: ['report', id],
     queryFn: () => api.get(`/reports/${id}`).then((r) => r.data),
   })
 
   const handlePdf = async () => {
-    const res = await api.get(`/reports/${id}/pdf`, { responseType: 'blob' })
-    const url = URL.createObjectURL(res.data)
-    const a = document.createElement('a'); a.href = url
-    a.download = `getafix-report-${id.slice(0, 8)}.pdf`
-    a.click(); URL.revokeObjectURL(url)
+    if (dlState === 'loading') return
+    setDlState('loading')
+    try {
+      const res = await api.get(`/reports/${id}/pdf`, { responseType: 'blob' })
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement('a'); a.href = url
+      a.download = `getafix-report-${id.slice(0, 8)}.pdf`
+      a.click(); URL.revokeObjectURL(url)
+      setDlState('done')
+      setTimeout(() => setDlState(null), 2000)
+    } catch {
+      setDlState(null)
+      alert('PDF indirilemedi.')
+    }
   }
 
   if (isLoading) return <div className="p-8 text-slate-400">Yükleniyor...</div>
@@ -35,8 +46,18 @@ function ReportDetail({ id }) {
         <button onClick={() => navigate('/reports')} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
           <ArrowLeft size={18} /> Rapora Dön
         </button>
-        <button onClick={handlePdf} className="btn-secondary flex items-center gap-2 text-sm">
-          <Download size={16} /> PDF İndir
+        <button
+          onClick={handlePdf}
+          disabled={dlState === 'loading'}
+          className={`btn-secondary flex items-center gap-2 text-sm disabled:opacity-60 ${dlState === 'done' ? 'text-green-400 border-green-500/30' : ''}`}
+        >
+          {dlState === 'loading' ? (
+            <><Loader2 size={16} className="animate-spin" /> İndiriliyor...</>
+          ) : dlState === 'done' ? (
+            <>✓ İndirildi</>
+          ) : (
+            <><Download size={16} /> PDF İndir</>
+          )}
         </button>
       </div>
       <div className="glass p-8 prose prose-invert max-w-none

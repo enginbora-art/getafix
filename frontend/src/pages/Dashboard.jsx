@@ -58,7 +58,16 @@ export default function Dashboard() {
         {/* BIST Panel */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">BIST Son Öneri</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-white">BIST Son Öneri</h2>
+              {bistReport?.type === 'MANUAL' && (
+                <span style={{
+                  background: 'rgba(99,102,241,0.15)', color: '#818cf8',
+                  fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                  border: '0.5px solid rgba(99,102,241,0.3)', fontWeight: 500,
+                }}>Manuel Analiz</span>
+              )}
+            </div>
             <MarketStatus market="BIST" />
           </div>
           {bistReport ? (
@@ -73,7 +82,16 @@ export default function Dashboard() {
         {/* US Panel */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">US Son Öneri</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-white">US Son Öneri</h2>
+              {usReport?.type === 'MANUAL' && (
+                <span style={{
+                  background: 'rgba(99,102,241,0.15)', color: '#818cf8',
+                  fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                  border: '0.5px solid rgba(99,102,241,0.3)', fontWeight: 500,
+                }}>Manuel Analiz</span>
+              )}
+            </div>
             <MarketStatus market="US" />
           </div>
           {usReport ? (

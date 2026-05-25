@@ -25,6 +25,7 @@ router.get('/', authMiddleware, async (req, res) => {
         select: {
           id: true,
           market: true,
+          type: true,
           date: true,
           ticker: true,
           entryLow: true,
@@ -98,14 +99,9 @@ router.get('/portfolio', authMiddleware, async (req, res) => {
 
       const effectiveEntry = r.userEntryPrice || entryPrice;
 
-      const returnShort =
-        r.targetShort != null && r.currentPrice != null
-          ? parseFloat(((r.targetShort - r.currentPrice) / r.currentPrice * 100).toFixed(2))
-          : null;
-
-      const returnMid =
-        r.targetMid != null && r.currentPrice != null
-          ? parseFloat(((r.targetMid - r.currentPrice) / r.currentPrice * 100).toFixed(2))
+      const returnPct =
+        effectiveEntry && r.currentPrice != null
+          ? parseFloat(((r.currentPrice - effectiveEntry) / effectiveEntry * 100).toFixed(2))
           : null;
 
       return {
@@ -122,8 +118,7 @@ router.get('/portfolio', authMiddleware, async (req, res) => {
         stopLoss: r.stopLoss,
         riskLevel: r.riskLevel,
         currentPrice: r.currentPrice ?? null,
-        returnShort,
-        returnMid,
+        returnPct,
       };
     });
 
