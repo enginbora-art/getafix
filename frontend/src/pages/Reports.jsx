@@ -109,17 +109,55 @@ function ReportList() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {data?.reports?.map((r) => <ReportCard key={r.id} report={r} />)}
           </div>
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-4 mt-8">
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-secondary disabled:opacity-40">
-                <ChevronLeft size={18} />
-              </button>
-              <span className="text-slate-400 text-sm">Sayfa {page} / {totalPages}</span>
-              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="btn-secondary disabled:opacity-40">
-                <ChevronRight size={18} />
-              </button>
-            </div>
-          )}
+
+          {/* Pagination — always visible */}
+          <div className="flex items-center justify-center gap-1.5 mt-6">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft size={15} /> Önceki
+            </button>
+
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(n => totalPages <= 7 || Math.abs(n - page) <= 2 || n === 1 || n === totalPages)
+              .reduce((acc, n, idx, arr) => {
+                if (idx > 0 && n - arr[idx - 1] > 1) acc.push('…')
+                acc.push(n)
+                return acc
+              }, [])
+              .map((n, i) =>
+                n === '…' ? (
+                  <span key={`ellipsis-${i}`} className="px-2 text-slate-600 text-sm">…</span>
+                ) : (
+                  <button
+                    key={n}
+                    onClick={() => setPage(n)}
+                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                      n === page
+                        ? 'bg-teal-600 text-white border border-teal-500'
+                        : 'border border-white/10 text-slate-400 hover:text-white hover:border-white/20'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                )
+              )
+            }
+
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              Sonraki <ChevronRight size={15} />
+            </button>
+          </div>
+
+          <p className="text-center text-xs text-slate-600 mt-2">
+            Sayfa {page} / {totalPages} · {data?.total ?? 0} rapor
+          </p>
         </>
       )}
     </div>
