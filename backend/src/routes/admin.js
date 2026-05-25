@@ -106,10 +106,28 @@ router.post('/users/:id/reset-password', async (req, res) => {
 router.delete('/users/:id', async (req, res) => {
   try {
     if (req.params.id === req.user.id) {
-      return res.status(400).json({ error: 'Kendi hesabınızı silemezsiniz' });
+      return res.status(400).json({ error: 'Kendi hesabınızı silemezsiniz.' });
     }
-    await prisma.user.delete({ where: { id: req.params.id } });
-    res.json({ message: 'Kullanıcı silindi' });
+
+    const target = await prisma.user.findUnique({
+      where: { id: req.params.id },
+      select: { role: true },
+    });
+    if (!target) return res.status(404).json({ error: 'Kullanıcı bulunamadı.' });
+
+    if (target.role === 'ADMIN') {
+      const adminCount = await prisma.user.count({ where: { role: 'ADMIN' } });
+      if (adminCount <= 1) {
+        return res.status(400).json({ error: 'Son admin kullanıcı silinemez.' });
+      }
+    }
+
+    await prisma.$transaction([
+      prisma.manualRequest.deleteMany({ where: { userId: req.params.id } }),
+      prisma.user.delete({ where: { id: req.params.id } }),
+    ]);
+
+    res.json({ message: 'Kullanıcı silindi.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
