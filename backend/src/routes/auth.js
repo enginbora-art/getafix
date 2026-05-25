@@ -21,7 +21,7 @@ router.post('/login', async (req, res) => {
     if (!email || !password || !isValidEmail(email)) {
       return res.status(400).json({ error: 'Geçerli bir email ve şifre girin.' });
     }
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
     if (!user || !user.isActive) {
       return res.status(401).json({ error: 'Email veya şifre hatalı' });
     }
@@ -99,7 +99,7 @@ router.post('/forgot-password', async (req, res) => {
       return res.status(400).json({ error: 'Geçerli bir email adresi girin.' });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
 
     if (!user) {
       return res.json({ message: 'Şifre sıfırlama bağlantısı email adresinize gönderildi.' });

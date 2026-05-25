@@ -29,7 +29,8 @@ router.get('/users', async (req, res) => {
 // POST /api/admin/users
 router.post('/users', async (req, res) => {
   try {
-    const { email, name, role = 'USER' } = req.body;
+    const { name, role = 'USER' } = req.body;
+    const email = req.body.email?.toLowerCase().trim();
     if (!email || !name) return res.status(400).json({ error: 'Email ve isim zorunlu' });
     if (!isValidEmail(email)) return res.status(400).json({ error: 'Geçerli bir email adresi girin.' });
     if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: 'Geçersiz rol.' });
