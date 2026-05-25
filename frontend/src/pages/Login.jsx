@@ -28,9 +28,8 @@ function Cauldron() {
       <style>{cauldronStyles}</style>
       <svg
         viewBox="0 0 340 480"
-        width="300"
-        height="430"
-        style={{ overflow: 'visible' }}
+        width="100%"
+        style={{ maxWidth: 300, overflow: 'visible' }}
       >
         {/* Ground shadow */}
         <ellipse cx="170" cy="462" rx="108" ry="16" fill="#000" opacity="0.45" />

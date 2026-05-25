@@ -41,7 +41,7 @@ function ReportDetail({ id }) {
   if (!report) return <div className="p-8 text-slate-400">Rapor bulunamadı</div>
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-4 md:p-8 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <button onClick={() => navigate('/reports')} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
           <ArrowLeft size={18} /> Rapora Dön
@@ -86,7 +86,7 @@ function ReportList() {
   const totalPages = data ? Math.ceil(data.total / 20) : 1
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <h1 className="text-2xl font-bold text-white mb-6">Raporlar</h1>
 
       <div className="flex gap-2 mb-6">

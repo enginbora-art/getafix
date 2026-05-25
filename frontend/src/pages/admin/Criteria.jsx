@@ -52,7 +52,7 @@ export default function AdminCriteria() {
   const filtered = criteria.filter((c) => c.market === market)
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <h1 className="text-2xl font-bold text-white mb-6">Kriter Düzenleyici</h1>
       <p className="text-slate-500 text-sm mb-6">Değişiklikler 1 saniye sonra otomatik kaydedilir.</p>
 

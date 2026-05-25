@@ -67,7 +67,7 @@ export default function AdminAgents() {
   const filtered = agents.filter((a) => a.market === market)
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <h1 className="text-2xl font-bold text-white mb-6">Ajan Yapılandırması</h1>
 
       <div className="flex gap-2 mb-6">

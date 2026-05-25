@@ -221,7 +221,7 @@ export default function AdminUsers() {
   })
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-white">Kullanıcı Yönetimi</h1>
         <button onClick={() => setShowNewModal(true)} className="btn-primary flex items-center gap-2">
@@ -230,6 +230,7 @@ export default function AdminUsers() {
       </div>
 
       <div className="glass overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-white/10">
@@ -290,6 +291,7 @@ export default function AdminUsers() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {showNewModal && <NewUserModal onClose={() => setShowNewModal(false)} />}
