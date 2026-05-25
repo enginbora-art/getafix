@@ -166,4 +166,23 @@ Getafix — Yatırım tavsiyesi değildir. Karar destek aracıdır.`;
   });
 }
 
-module.exports = { sendForecastEmail, sendWelcomeEmail, sendErrorEmail, sendPasswordResetEmail };
+async function sendActivationEmail({ to, name, activationUrl }) {
+  const markdownBody = `# Getafix'e Hoş Geldiniz, ${name}!
+
+Hesabınız oluşturuldu. Şifrenizi belirlemek için aşağıdaki butona tıklayın:
+
+[Şifremi Belirle](${activationUrl})
+
+> Bu bağlantı **7 gün** geçerlidir.
+
+---
+Getafix — Yatırım tavsiyesi değildir. Karar destek aracıdır.`;
+
+  return sendMail({
+    to,
+    subject: 'Getafix — Hesabınız Hazır, Şifrenizi Belirleyin',
+    markdownBody,
+  });
+}
+
+module.exports = { sendForecastEmail, sendWelcomeEmail, sendErrorEmail, sendPasswordResetEmail, sendActivationEmail };

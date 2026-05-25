@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const authMiddleware = require('../middleware/auth');
 const requireAdmin = require('../middleware/requireAdmin');
 const prisma = require('../lib/prisma');
-const { sendWelcomeEmail } = require('../services/email');
+const { sendActivationEmail, sendPasswordResetEmail } = require('../services/email');
 
 const router = express.Router();
 
@@ -36,15 +36,21 @@ router.post('/users', async (req, res) => {
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(409).json({ error: 'Bu email zaten kayıtlı' });
 
-    const tempPassword = crypto.randomBytes(8).toString('base64url').slice(0, 12);
-    const hashed = await bcrypt.hash(tempPassword, 12);
+    const activationToken = crypto.randomBytes(32).toString('hex');
+    const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const tempHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12);
+
     const user = await prisma.user.create({
-      data: { email, name, password: hashed, role, isActive: true, mustChangePassword: true },
+      data: {
+        email, name, password: tempHash, role, isActive: true, mustChangePassword: true,
+        resetToken: activationToken, resetTokenExpiry: expiry,
+      },
       select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
     });
 
-    sendWelcomeEmail({ to: email, name, tempPassword }).catch((err) =>
-      console.error('[admin] Hoşgeldin maili gönderilemedi:', err.message),
+    const activationUrl = `${process.env.FRONTEND_URL}/reset-password?token=${activationToken}&activation=true`;
+    sendActivationEmail({ to: email, name, activationUrl }).catch((err) =>
+      console.error('[admin] Aktivasyon maili gönderilemedi:', err.message),
     );
 
     res.status(201).json(user);
@@ -84,19 +90,20 @@ router.post('/users/:id/reset-password', async (req, res) => {
     const target = await prisma.user.findUnique({ where: { id: req.params.id } });
     if (!target) return res.status(404).json({ error: 'Kullanıcı bulunamadı.' });
 
-    const tempPassword = crypto.randomBytes(8).toString('base64url').slice(0, 12);
-    const hashed = await bcrypt.hash(tempPassword, 12);
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     await prisma.user.update({
       where: { id: req.params.id },
-      data: { password: hashed, mustChangePassword: true },
+      data: { resetToken: token, resetTokenExpiry: expiry, mustChangePassword: true },
     });
 
-    sendWelcomeEmail({ to: target.email, name: target.name, tempPassword }).catch((err) =>
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+    sendPasswordResetEmail({ to: target.email, name: target.name, resetUrl }).catch((err) =>
       console.error('[admin] Şifre sıfırlama maili gönderilemedi:', err.message),
     );
 
-    res.json({ ok: true });
+    res.json({ ok: true, message: 'Şifre sıfırlama linki gönderildi.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

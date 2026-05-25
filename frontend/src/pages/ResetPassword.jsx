@@ -13,6 +13,7 @@ export default function ResetPassword() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token')
+  const isActivation = searchParams.get('activation') === 'true'
 
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -60,12 +61,21 @@ export default function ResetPassword() {
         <p className="text-slate-500 text-sm mb-8 pl-[52px]">AI Destekli Borsa Forecast</p>
 
         <div className="bg-white/5 border border-white/10 rounded-2xl p-8">
-          <h1 className="text-xl font-bold text-white mb-1">Yeni Şifre Belirle</h1>
-          <p className="text-slate-400 text-sm mb-6">Yeni şifrenizi girin.</p>
+          <h1 className="text-xl font-bold text-white mb-1">
+            {isActivation ? 'Şifrenizi Belirleyin' : 'Yeni Şifre Belirle'}
+          </h1>
+          <p className="text-slate-400 text-sm mb-6">
+            {isActivation
+              ? 'Getafix hesabınıza hoş geldiniz. Şifrenizi belirleyerek başlayın.'
+              : 'Yeni şifrenizi girin.'}
+          </p>
 
           {success ? (
             <div className="bg-green-500/10 border border-green-500/20 rounded-lg px-4 py-4 text-green-400 text-sm">
-              Şifreniz güncellendi! Giriş sayfasına yönlendiriliyorsunuz...
+              {isActivation
+                ? 'Şifreniz belirlendi! Giriş yapabilirsiniz.'
+                : 'Şifreniz güncellendi!'}{' '}
+              Giriş sayfasına yönlendiriliyorsunuz...
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
