@@ -492,25 +492,31 @@ async function runManualAnalysis(ticker, onStep = null, context = {}) {
 
   const now = new Date();
   const rec = parseForecastJson(rManager.text);
-  await prisma.report.create({
-    data: {
-      market: 'US',
-      type: 'MANUAL',
-      date: now,
-      content: rManager.text,
-      jsonData: rec || undefined,
-      ticker: rec?.ticker || ticker,
-      entryLow: rec?.entry_low || null,
-      entryHigh: rec?.entry_high || null,
-      stopLoss: rec?.stop_loss || null,
-      targetShort: rec?.target_short_low || null,
-      targetMid: rec?.target_mid_low || null,
-      riskLevel: rec?.risk_level || null,
-      isClosing: false,
-    },
-  }).catch((err) => console.error('[US] Manuel rapor yazılamadı:', err.message));
+  let reportId = null;
+  try {
+    const savedReport = await prisma.report.create({
+      data: {
+        market: 'US',
+        type: 'MANUAL',
+        date: now,
+        content: rManager.text,
+        jsonData: rec || undefined,
+        ticker: rec?.ticker || ticker,
+        entryLow: rec?.entry_low || null,
+        entryHigh: rec?.entry_high || null,
+        stopLoss: rec?.stop_loss || null,
+        targetShort: rec?.target_short_low || null,
+        targetMid: rec?.target_mid_low || null,
+        riskLevel: rec?.risk_level || null,
+        isClosing: false,
+      },
+    });
+    reportId = savedReport.id;
+  } catch (err) {
+    console.error('[US] Manuel rapor yazılamadı:', err.message);
+  }
 
-  return { result: rManager.text, currentPrice };
+  return { result: rManager.text, currentPrice, reportId };
 }
 
 module.exports = { runUsForecast, runManualAnalysis };

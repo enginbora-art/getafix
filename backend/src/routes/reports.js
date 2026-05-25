@@ -35,6 +35,7 @@ router.get('/', authMiddleware, async (req, res) => {
           targetMid: true,
           riskLevel: true,
           isClosing: true,
+          inPortfolio: true,
           createdAt: true,
         },
       }),
@@ -51,10 +52,9 @@ router.get('/', authMiddleware, async (req, res) => {
 router.get('/portfolio', authMiddleware, async (req, res) => {
   try {
     const yf = require('../lib/yf');
-    const since = new Date(Date.now() - 30 * 24 * 3600 * 1000);
 
     const reports = await prisma.report.findMany({
-      where: { createdAt: { gte: since }, ticker: { not: null } },
+      where: { inPortfolio: true, ticker: { not: null } },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true, market: true, createdAt: true, ticker: true,
@@ -165,6 +165,30 @@ router.put('/alerts/read-all', authMiddleware, async (req, res) => {
 router.put('/alerts/:id/read', authMiddleware, async (req, res) => {
   try {
     await prisma.portfolioAlert.update({ where: { id: req.params.id }, data: { isRead: true } });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/reports/:id/portfolio — takibe al
+router.post('/:id/portfolio', authMiddleware, async (req, res) => {
+  try {
+    const currentCount = await prisma.report.count({ where: { inPortfolio: true } });
+    if (currentCount >= 20) {
+      return res.status(400).json({ error: 'Genel tabloda maksimum 20 hisse takip edilebilir.' });
+    }
+    await prisma.report.update({ where: { id: req.params.id }, data: { inPortfolio: true } });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/reports/:id/portfolio — takipten çıkar
+router.delete('/:id/portfolio', authMiddleware, async (req, res) => {
+  try {
+    await prisma.report.update({ where: { id: req.params.id }, data: { inPortfolio: false } });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

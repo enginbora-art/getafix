@@ -256,14 +256,14 @@ export default function Portfolio() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-xs text-slate-500 border-b border-white/5 bg-white/3">
+                <tr className="text-xs text-slate-300 font-medium border-b border-white/5 bg-white/3">
                   <th className="text-left px-4 py-3">Hisse</th>
                   <th className="text-left px-4 py-3">Tarih</th>
                   <th className="text-left px-4 py-3">Karar</th>
                   <th className="text-right px-4 py-3">
-                    <span>Giriş</span>
-                    <span className="ml-1 text-slate-600 font-normal normal-case">✎</span>
-                    <div className="text-slate-700 font-normal normal-case" style={{ fontSize: 9 }}>tıkla düzenle</div>
+                    <span className="text-teal-400">Giriş</span>
+                    <span className="ml-1 text-teal-500 font-normal normal-case">✎</span>
+                    <div className="text-teal-600 font-normal normal-case" style={{ fontSize: 10 }}>düzenle</div>
                   </th>
                   <th className="text-right px-4 py-3">Stop</th>
                   <th className="text-right px-4 py-3">H1 (Kısa)</th>
@@ -327,7 +327,7 @@ export default function Portfolio() {
                           <span
                             onClick={() => { setEditingId(p.reportId); setEditValue(p.effectiveEntry ?? '') }}
                             title="Tıkla ve gerçek alış fiyatını gir"
-                            style={{ cursor: 'pointer', borderBottom: '1px dashed #334155', paddingBottom: 1 }}
+                            style={{ cursor: 'pointer', borderBottom: '1px dashed rgba(45,212,191,0.4)', paddingBottom: 1 }}
                           >
                             {p.effectiveEntry != null
                               ? `${p.effectiveEntry.toFixed(2)} ${currency}`

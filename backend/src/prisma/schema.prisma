@@ -45,6 +45,7 @@ model Report {
   targetMid   Float?
   riskLevel      String?
   isClosing      Boolean  @default(false)
+  inPortfolio    Boolean  @default(false)
   userEntryPrice Float?
   createdAt      DateTime @default(now())
   alerts         PortfolioAlert[]
@@ -104,6 +105,7 @@ model ManualRequest {
   totalInputTokens   Int?
   totalOutputTokens  Int?
   scenario           String?       @db.VarChar(500)
+  reportId           String?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 }

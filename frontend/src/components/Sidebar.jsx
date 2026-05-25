@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, FileText, Search, Users, Bot, SlidersHorizontal, DollarSign, BarChart2, LogOut, X, Activity } from 'lucide-react'
+import { LayoutDashboard, FileText, Search, Users, Bot, SlidersHorizontal, DollarSign, BarChart2, LogOut, X, Activity, BookOpen } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import Logo from './Logo'
 import api from '../lib/api'
@@ -102,6 +102,7 @@ export default function Sidebar({ isOpen, onClose }) {
             {navItem('/admin/agents', Bot, 'Ajan Yapılandırması')}
             {navItem('/admin/criteria', SlidersHorizontal, 'Kriter Düzenleyici')}
             {navItem('/admin/costs', DollarSign, 'Maliyet Takibi')}
+            {navItem('/admin/system-docs', BookOpen, 'Sistem Bilgisi')}
           </>
         )}
       </nav>

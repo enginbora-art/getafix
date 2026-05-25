@@ -17,6 +17,8 @@ const RISK_CONFIG = {
 export default function ReportCard({ report }) {
   const navigate = useNavigate()
   const [dlState, setDlState] = useState(null) // null | 'loading' | 'done'
+  const [inPortfolio, setInPortfolio] = useState(report.inPortfolio ?? false)
+  const [toggling, setToggling] = useState(false)
   const risk = RISK_CONFIG[report.riskLevel] || RISK_CONFIG['Orta']
   const RiskIcon = risk.Icon
 
@@ -37,6 +39,25 @@ export default function ReportCard({ report }) {
     } catch {
       setDlState(null)
       alert('PDF indirilemedi.')
+    }
+  }
+
+  const handleTogglePortfolio = async (e) => {
+    e.stopPropagation()
+    if (toggling) return
+    setToggling(true)
+    try {
+      if (inPortfolio) {
+        await api.delete(`/reports/${report.id}/portfolio`)
+        setInPortfolio(false)
+      } else {
+        await api.post(`/reports/${report.id}/portfolio`)
+        setInPortfolio(true)
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || 'Hata oluştu')
+    } finally {
+      setToggling(false)
     }
   }
 
@@ -96,7 +117,7 @@ export default function ReportCard({ report }) {
         </div>
       )}
 
-      <div className="flex gap-2 mt-auto">
+      <div className="flex gap-2 mt-auto flex-wrap">
         <button
           onClick={() => navigate(`/reports/${report.id}`)}
           className="flex-1 flex items-center justify-center gap-1.5 btn-secondary text-sm py-1.5"
@@ -117,6 +138,15 @@ export default function ReportCard({ report }) {
           ) : (
             <><Download size={14} /> PDF</>
           )}
+        </button>
+        <button
+          onClick={handleTogglePortfolio}
+          disabled={toggling}
+          className={`flex items-center gap-1.5 btn-secondary text-sm py-1.5 px-3 disabled:opacity-60 transition-colors ${
+            inPortfolio ? 'text-teal-400 border-teal-500/30' : ''
+          }`}
+        >
+          {toggling ? <Loader2 size={14} className="animate-spin" /> : inPortfolio ? '✓ Takipte' : '+ Takibe Al'}
         </button>
       </div>
     </div>

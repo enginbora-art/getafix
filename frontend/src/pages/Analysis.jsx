@@ -1,14 +1,22 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Search, Clock, CheckCircle, XCircle, Loader, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Clock, CheckCircle, XCircle, Loader, Trash2, ChevronLeft, ChevronRight, Eye, Download } from 'lucide-react'
 import { format } from 'date-fns'
 import { tr } from 'date-fns/locale'
 import api from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 
 const stripJsonBlocks = (content) => (content || '').replace(/```json[\s\S]*?```/g, '').trim()
+
+const parseResultJson = (content) => {
+  if (!content) return null
+  const m = content.match(/```json\s*([\s\S]*?)```/)
+  if (!m) return null
+  try { return JSON.parse(m[1]) } catch { return null }
+}
 
 const normalizeTicker = (val) => val.toUpperCase()
   .replace(/İ/g, 'I').replace(/Ğ/g, 'G').replace(/Ü/g, 'U')
@@ -30,10 +38,57 @@ const MARKET_META = {
   US:   { count: '214', label: 'US' },
 }
 
+const BIAS_STYLE = {
+  AL:    'bg-green-500/20 text-green-400 border-green-500/30',
+  SAT:   'bg-red-500/20 text-red-400 border-red-500/30',
+  BEKLE: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+}
+
+function PdfBtn({ reportId, market }) {
+  const [dlState, setDlState] = useState(null)
+  const handlePdf = async () => {
+    if (dlState === 'loading') return
+    setDlState('loading')
+    try {
+      const res = await api.get(`/reports/${reportId}/pdf`, { responseType: 'blob' })
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `getafix-${market}-${reportId.slice(0, 8)}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      setDlState('done')
+      setTimeout(() => setDlState(null), 2000)
+    } catch {
+      setDlState(null)
+      alert('PDF indirilemedi.')
+    }
+  }
+  return (
+    <button
+      onClick={handlePdf}
+      disabled={dlState === 'loading'}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+        color: dlState === 'done' ? '#4ade80' : '#94a3b8',
+        opacity: dlState === 'loading' ? 0.6 : 1,
+      }}
+    >
+      {dlState === 'loading'
+        ? <><Loader size={11} className="animate-spin" /> İndiriliyor...</>
+        : dlState === 'done'
+        ? <><CheckCircle size={11} /> İndirildi</>
+        : <><Download size={11} /> PDF</>}
+    </button>
+  )
+}
+
 // ─── System Run Section ───────────────────────────────────────────
 function SystemRunSection({ market, isAdmin }) {
   const { count, label } = MARKET_META[market]
-  const [sysStatus, setSysStatus] = useState(undefined) // undefined = loading, null = no runs, object = data
+  const [sysStatus, setSysStatus] = useState(undefined)
   const [running, setRunning] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const pollRef = useRef(null)
@@ -50,7 +105,6 @@ function SystemRunSection({ market, isAdmin }) {
 
   useEffect(() => { fetchStatus() }, [fetchStatus])
 
-  // live elapsed counter when RUNNING
   useEffect(() => {
     if (sysStatus?.status !== 'RUNNING') { setElapsed(0); return }
     const update = () => setElapsed(
@@ -61,7 +115,6 @@ function SystemRunSection({ market, isAdmin }) {
     return () => clearInterval(id)
   }, [sysStatus?.status, sysStatus?.startedAt])
 
-  // poll every 5s when RUNNING
   useEffect(() => {
     if (sysStatus?.status !== 'RUNNING') {
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
@@ -97,7 +150,6 @@ function SystemRunSection({ market, isAdmin }) {
       padding: '14px 16px',
       marginBottom: 16,
     }}>
-      {/* Header row */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-white leading-snug">
@@ -106,7 +158,7 @@ function SystemRunSection({ market, isAdmin }) {
           <p className="text-xs text-slate-400 mt-1">
             {count} hisseyi tarar, top 8 seçer, 3+1 ajan analizi yapar.
           </p>
-          <p className="text-xs text-slate-500 mt-0.5">⏱ Tahmini süre: 8–12 dakika</p>
+          <p className="text-xs text-slate-500 mt-0.5">⏱ Tahmini süre: 2–4 dakika</p>
         </div>
         {isAdmin && (
           <button
@@ -124,7 +176,6 @@ function SystemRunSection({ market, isAdmin }) {
         )}
       </div>
 
-      {/* Status row */}
       <div className="mt-3 min-h-[18px]">
         {sysStatus === undefined && (
           <p className="text-xs text-slate-500">Yükleniyor...</p>
@@ -255,7 +306,9 @@ const HISTORY_PER_PAGE = 5
 
 // ─── Main Page ────────────────────────────────────────────────────
 export default function Analysis() {
-  const [selected, setSelected] = useState(null)
+  const navigate = useNavigate()
+  const [expandedId, setExpandedId] = useState(null)
+  const [portfolioOverrides, setPortfolioOverrides] = useState({})
   const [historyPage, setHistoryPage] = useState(1)
   const qc = useQueryClient()
   const { user } = useAuth()
@@ -283,6 +336,22 @@ export default function Analysis() {
     await api.get('/analysis/requests?clear=true')
     qc.invalidateQueries({ queryKey: ['analysis-requests'] })
     setHistoryPage(1)
+  }
+
+  const togglePortfolio = async (req) => {
+    if (!req.reportId) return
+    const currentState = portfolioOverrides[req.reportId] ?? req.inPortfolio ?? false
+    try {
+      if (currentState) {
+        await api.delete(`/reports/${req.reportId}/portfolio`)
+        setPortfolioOverrides((prev) => ({ ...prev, [req.reportId]: false }))
+      } else {
+        await api.post(`/reports/${req.reportId}/portfolio`)
+        setPortfolioOverrides((prev) => ({ ...prev, [req.reportId]: true }))
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || 'Hata oluştu')
+    }
   }
 
   return (
@@ -315,10 +384,15 @@ export default function Analysis() {
           const SIcon = s.Icon
           const isProcessing = req.status === 'PROCESSING'
           const statusLabel = isProcessing && req.currentStep ? req.currentStep : s.label
+          const isDone = req.status === 'DONE' && !!req.result
 
           return (
             <div key={req.id} className="glass p-4">
-              <div className="flex items-center justify-between">
+              {/* Card header — clickable for DONE items */}
+              <div
+                className={`flex items-center justify-between ${isDone ? 'cursor-pointer' : ''}`}
+                onClick={isDone ? () => setExpandedId(expandedId === req.id ? null : req.id) : undefined}
+              >
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className={`badge border ${req.market === 'BIST' ? 'text-teal-400 bg-teal-400/10 border-teal-400/20' : 'text-blue-400 bg-blue-400/10 border-blue-400/20'}`}>
                     {req.market}
@@ -339,41 +413,124 @@ export default function Analysis() {
                 </div>
               </div>
 
-              {req.status === 'DONE' && req.result && (
-                <div className="mt-3">
-                  {selected === req.id ? (
-                    <div className="mt-3 p-4 bg-white/5 rounded-lg prose prose-sm prose-invert max-w-none
-                      prose-headings:text-teal-400 prose-strong:text-white
-                      prose-table:w-full prose-table:border-collapse
-                      prose-th:border prose-th:border-white/10 prose-th:p-3 prose-th:text-left prose-th:bg-white/5
-                      prose-td:border prose-td:border-white/10 prose-td:p-3
-                      [&_h2:has(⚡)]:text-2xl [&_h2:has(⚡)]:font-black [&_h2:has(⚡)]:text-white">
-                      {req.currentPrice != null && (
-                        <p className="not-prose text-sm text-slate-400 mb-3">
-                          Analiz anı fiyatı:{' '}
-                          <span className="text-white font-semibold">
-                            {req.currentPrice.toFixed(2)} {req.market === 'BIST' ? 'TL' : '$'}
-                          </span>
-                        </p>
+              {/* DONE: compact summary card */}
+              {isDone && (() => {
+                const rec = parseResultJson(req.result)
+                const biasMatch = req.result.match(/##\s*⚡\s*KARAR:\s*(AL|SAT|BEKLE)/i)
+                const bias = biasMatch?.[1]?.toUpperCase()
+                const currency = req.market === 'BIST' ? 'TL' : '$'
+                const isInPortfolio = portfolioOverrides[req.reportId] ?? req.inPortfolio ?? false
+
+                const summaryRows = rec
+                  ? [
+                      ['Giriş', rec.entry_low != null ? `${rec.entry_low}${rec.entry_high ? `–${rec.entry_high}` : ''} ${currency}` : null],
+                      ['Stop', rec.stop_loss != null ? `${rec.stop_loss} ${currency}` : null],
+                      ['H1', rec.target_short_low != null ? `${rec.target_short_low} ${currency}` : null],
+                      ['H2', rec.target_mid_low != null ? `${rec.target_mid_low} ${currency}` : null],
+                      ['Risk', rec.risk_level || null],
+                    ].filter(([, v]) => v != null)
+                  : []
+
+                return (
+                  <div className="mt-3">
+                    <div style={{
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: 10, padding: '12px 14px',
+                    }}>
+                      {/* Bias + Takibe Al row */}
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {bias && (
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-sm font-bold border ${BIAS_STYLE[bias] || 'text-slate-400 border-white/10'}`}>
+                              ⚡ {bias}
+                            </span>
+                          )}
+                          {req.currentPrice != null && (
+                            <span className="text-xs text-slate-500">
+                              Fiyat: <span className="text-slate-300">{req.currentPrice.toFixed(2)} {currency}</span>
+                            </span>
+                          )}
+                        </div>
+                        {req.reportId && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); togglePortfolio(req) }}
+                            style={{
+                              padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                              background: isInPortfolio ? 'rgba(45,212,191,0.15)' : 'rgba(255,255,255,0.06)',
+                              border: `1px solid ${isInPortfolio ? 'rgba(45,212,191,0.4)' : 'rgba(255,255,255,0.12)'}`,
+                              color: isInPortfolio ? '#2dd4bf' : '#94a3b8',
+                            }}
+                          >
+                            {isInPortfolio ? '✓ Takipte' : '+ Takibe Al'}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Key metrics grid */}
+                      {summaryRows.length > 0 && (
+                        <div className="mt-3 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(summaryRows.length, 5)}, 1fr)` }}>
+                          {summaryRows.map(([label, value]) => (
+                            <div key={label} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '5px 8px' }}>
+                              <div className="text-slate-600 text-xs">{label}</div>
+                              <div className="text-slate-200 text-xs font-medium mt-0.5">{value}</div>
+                            </div>
+                          ))}
+                        </div>
                       )}
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{stripJsonBlocks(req.result)}</ReactMarkdown>
-                      <button
-                        onClick={() => setSelected(null)}
-                        className="text-slate-400 hover:text-white text-xs mt-2 not-prose"
-                      >
-                        Gizle
-                      </button>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
+                        {req.reportId && (
+                          <>
+                            <button
+                              onClick={() => navigate(`/reports/${req.reportId}`)}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                                padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                                background: 'rgba(45,212,191,0.1)', border: '1px solid rgba(45,212,191,0.25)',
+                                color: '#2dd4bf',
+                              }}
+                            >
+                              <Eye size={11} /> Tam Rapor
+                            </button>
+                            <PdfBtn reportId={req.reportId} market={req.market} />
+                          </>
+                        )}
+                        <button
+                          onClick={() => setExpandedId(expandedId === req.id ? null : req.id)}
+                          style={{
+                            padding: '5px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                            background: 'none', border: 'none', color: '#64748b',
+                          }}
+                        >
+                          {expandedId === req.id ? 'Gizle ↑' : 'Tam Metin ↓'}
+                        </button>
+                      </div>
+
+                      {/* Expanded full markdown */}
+                      {expandedId === req.id && (
+                        <div className="mt-3 p-4 bg-white/5 rounded-lg prose prose-sm prose-invert max-w-none
+                          prose-headings:text-teal-400 prose-strong:text-white
+                          prose-table:w-full prose-table:border-collapse
+                          prose-th:border prose-th:border-white/10 prose-th:p-3 prose-th:text-left prose-th:bg-white/5
+                          prose-td:border prose-td:border-white/10 prose-td:p-3
+                          [&_h2:has(⚡)]:text-2xl [&_h2:has(⚡)]:font-black [&_h2:has(⚡)]:text-white">
+                          {req.currentPrice != null && (
+                            <p className="not-prose text-sm text-slate-400 mb-3">
+                              Analiz anı fiyatı:{' '}
+                              <span className="text-white font-semibold">
+                                {req.currentPrice.toFixed(2)} {currency}
+                              </span>
+                            </p>
+                          )}
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{stripJsonBlocks(req.result)}</ReactMarkdown>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => setSelected(req.id)}
-                      className="text-teal-400 hover:text-teal-300 text-sm mt-1"
-                    >
-                      Sonucu Görüntüle →
-                    </button>
-                  )}
-                </div>
-              )}
+                  </div>
+                )
+              })()}
 
               {req.status === 'FAILED' && req.result && (
                 <p className="text-red-400 text-sm mt-2">{req.result}</p>

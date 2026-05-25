@@ -16,6 +16,7 @@ import AdminAgents from './pages/admin/Agents'
 import AdminCriteria from './pages/admin/Criteria'
 import AdminCosts from './pages/admin/Costs'
 import AdminAnalyses from './pages/admin/Analyses'
+import SystemDocs from './pages/admin/SystemDocs'
 
 export default function App() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
             <Route path="/admin/criteria" element={<ProtectedRoute adminOnly><AdminCriteria /></ProtectedRoute>} />
             <Route path="/admin/costs" element={<ProtectedRoute adminOnly><AdminCosts /></ProtectedRoute>} />
             <Route path="/admin/analyses" element={<ProtectedRoute adminOnly><AdminAnalyses /></ProtectedRoute>} />
+            <Route path="/admin/system-docs" element={<ProtectedRoute adminOnly><SystemDocs /></ProtectedRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

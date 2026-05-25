@@ -44,7 +44,22 @@ router.get('/requests', authMiddleware, async (req, res) => {
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
-    res.json(requests);
+
+    const reportIds = requests.map((r) => r.reportId).filter(Boolean);
+    let inPortfolioMap = {};
+    if (reportIds.length > 0) {
+      const rpts = await prisma.report.findMany({
+        where: { id: { in: reportIds } },
+        select: { id: true, inPortfolio: true },
+      });
+      rpts.forEach((r) => { inPortfolioMap[r.id] = r.inPortfolio; });
+    }
+
+    const enriched = requests.map((r) => ({
+      ...r,
+      inPortfolio: r.reportId ? (inPortfolioMap[r.reportId] ?? false) : false,
+    }));
+    res.json(enriched);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -150,11 +165,11 @@ async function processManualRequest(requestId) {
         : require('../services/forecast/us');
 
     const onStep = (step) => updateStep(requestId, step);
-    const { result, currentPrice } = await runManualAnalysis(req.ticker, onStep, { userId, requestId, scenario: req.scenario });
+    const { result, currentPrice, reportId } = await runManualAnalysis(req.ticker, onStep, { userId, requestId, scenario: req.scenario });
 
     await prisma.manualRequest.update({
       where: { id: requestId },
-      data: { status: 'DONE', result, currentStep: 'Tamamlandı', currentPrice: currentPrice ?? null },
+      data: { status: 'DONE', result, currentStep: 'Tamamlandı', currentPrice: currentPrice ?? null, reportId: reportId ?? null },
     });
   } catch (err) {
     await prisma.manualRequest.update({
