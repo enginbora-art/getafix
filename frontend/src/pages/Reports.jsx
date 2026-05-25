@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Download, ArrowLeft, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { Download, ArrowLeft, ChevronLeft, ChevronRight, Loader2, CheckCircle } from 'lucide-react'
 import api from '../lib/api'
 import ReportCard from '../components/ReportCard'
 
@@ -54,7 +54,7 @@ function ReportDetail({ id }) {
           {dlState === 'loading' ? (
             <><Loader2 size={16} className="animate-spin" /> İndiriliyor...</>
           ) : dlState === 'done' ? (
-            <>✓ İndirildi</>
+            <><CheckCircle size={16} /> İndirildi</>
           ) : (
             <><Download size={16} /> PDF İndir</>
           )}
@@ -80,10 +80,11 @@ function ReportList() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['reports', market, page],
-    queryFn: () => api.get(`/reports?market=${market}&limit=20&page=${page}`).then((r) => r.data),
+    queryFn: () => api.get(`/reports?market=${market}&limit=6&page=${page}`).then((r) => r.data),
+    keepPreviousData: true,
   })
 
-  const totalPages = data ? Math.ceil(data.total / 20) : 1
+  const totalPages = data?.totalPages ?? 1
 
   return (
     <div className="p-4 md:p-8">
@@ -93,7 +94,7 @@ function ReportList() {
         {['BIST', 'US'].map((m) => (
           <button
             key={m}
-            onClick={() => { setMarket(m); setPage(1) }}
+            onClick={() => { setMarket(m); setPage(1); }}
             className={`px-6 py-2 rounded-lg font-medium text-sm transition-colors ${market === m ? 'btn-primary' : 'btn-secondary'}`}
           >
             {m}

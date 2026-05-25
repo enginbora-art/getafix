@@ -41,7 +41,7 @@ router.get('/', authMiddleware, async (req, res) => {
       prisma.report.count({ where }),
     ]);
 
-    res.json({ reports, total, page: parseInt(page), limit: take });
+    res.json({ reports, total, page: parseInt(page), limit: take, totalPages: Math.ceil(total / take) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
