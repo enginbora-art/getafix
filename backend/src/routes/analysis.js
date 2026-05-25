@@ -45,20 +45,47 @@ router.get('/requests', authMiddleware, async (req, res) => {
       take: 50,
     });
 
-    const reportIds = requests.map((r) => r.reportId).filter(Boolean);
+    // Backfill reportId for old DONE requests that predate the column
+    const doneNoReport = requests.filter((r) => r.status === 'DONE' && !r.reportId && r.ticker);
+    const backfillMap = {};
+    if (doneNoReport.length > 0) {
+      const minDate = doneNoReport.reduce((d, r) => (r.createdAt < d ? r.createdAt : d), doneNoReport[0].createdAt);
+      const manualReports = await prisma.report.findMany({
+        where: {
+          type: 'MANUAL',
+          ticker: { in: [...new Set(doneNoReport.map((r) => r.ticker))] },
+          market: { in: [...new Set(doneNoReport.map((r) => r.market))] },
+          createdAt: { gte: minDate },
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, market: true, ticker: true, createdAt: true },
+      });
+      doneNoReport.forEach((r) => {
+        const match = manualReports.find(
+          (rep) => rep.market === r.market && rep.ticker === r.ticker && rep.createdAt >= r.createdAt,
+        );
+        if (match) backfillMap[r.id] = match.id;
+      });
+    }
+
+    const allReportIds = requests.map((r) => backfillMap[r.id] ?? r.reportId).filter(Boolean);
     let inPortfolioMap = {};
-    if (reportIds.length > 0) {
+    if (allReportIds.length > 0) {
       const rpts = await prisma.report.findMany({
-        where: { id: { in: reportIds } },
+        where: { id: { in: allReportIds } },
         select: { id: true, inPortfolio: true },
       });
       rpts.forEach((r) => { inPortfolioMap[r.id] = r.inPortfolio; });
     }
 
-    const enriched = requests.map((r) => ({
-      ...r,
-      inPortfolio: r.reportId ? (inPortfolioMap[r.reportId] ?? false) : false,
-    }));
+    const enriched = requests.map((r) => {
+      const effectiveReportId = r.reportId ?? backfillMap[r.id] ?? null;
+      return {
+        ...r,
+        reportId: effectiveReportId,
+        inPortfolio: effectiveReportId ? (inPortfolioMap[effectiveReportId] ?? false) : false,
+      };
+    });
     res.json(enriched);
   } catch (err) {
     res.status(500).json({ error: err.message });
