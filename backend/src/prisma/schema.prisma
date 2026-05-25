@@ -28,6 +28,7 @@ enum Role {
 model Report {
   id          String   @id @default(cuid())
   market      Market
+  type        String   @default("SCHEDULED")
   date        DateTime @default(now())
   content     String   @db.Text
   jsonData    Json?
