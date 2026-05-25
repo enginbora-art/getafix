@@ -24,7 +24,7 @@ function MarketStatus({ market }) {
   return (
     <span className={`flex items-center gap-1.5 text-xs font-medium ${isOpen ? 'text-green-400' : 'text-slate-500'}`}>
       <Circle size={8} fill="currentColor" />
-      {isOpen ? 'Açık' : 'Kapalı'}
+      {isOpen ? 'Borsa Açık' : 'Borsa Kapalı'}
     </span>
   )
 }
