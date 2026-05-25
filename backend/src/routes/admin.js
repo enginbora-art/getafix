@@ -252,6 +252,35 @@ router.get('/costs', async (req, res) => {
   }
 });
 
+// GET /api/admin/analyses
+router.get('/analyses', async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, parseInt(req.query.limit) || 20);
+    const { userId, market, status } = req.query;
+
+    const where = {};
+    if (userId) where.userId = userId;
+    if (market && ['BIST', 'US'].includes(market)) where.market = market;
+    if (status) where.status = status;
+
+    const [total, items] = await Promise.all([
+      prisma.manualRequest.count({ where }),
+      prisma.manualRequest.findMany({
+        where,
+        include: { user: { select: { id: true, name: true, email: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    res.json({ total, page, totalPages: Math.ceil(total / limit), items });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/admin/forecast/run
 router.post('/forecast/run', async (req, res) => {
   try {

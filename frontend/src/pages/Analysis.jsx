@@ -6,6 +6,7 @@ import { Search, Clock, CheckCircle, XCircle, Loader, Trash2 } from 'lucide-reac
 import { format } from 'date-fns'
 import { tr } from 'date-fns/locale'
 import api from '../lib/api'
+import { useAuth } from '../context/AuthContext'
 
 const stripJsonBlocks = (content) => (content || '').replace(/```json[\s\S]*?```/g, '').trim()
 
@@ -98,6 +99,8 @@ function MarketForm({ market, label, placeholder }) {
 export default function Analysis() {
   const [selected, setSelected] = useState(null)
   const qc = useQueryClient()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'ADMIN'
 
   const { data: requests = [] } = useQuery({
     queryKey: ['analysis-requests'],
@@ -160,9 +163,14 @@ export default function Analysis() {
                     {statusLabel}
                   </span>
                 </div>
-                <span className="text-xs text-slate-500 shrink-0">
-                  {format(new Date(req.createdAt), 'dd MMM HH:mm', { locale: tr })}
-                </span>
+                <div className="flex items-center gap-3 shrink-0">
+                  {isAdmin && req.user && (
+                    <span className="text-xs text-slate-500">{req.user.name}</span>
+                  )}
+                  <span className="text-xs text-slate-500">
+                    {format(new Date(req.createdAt), 'dd MMM HH:mm', { locale: tr })}
+                  </span>
+                </div>
               </div>
 
               {req.status === 'DONE' && req.result && (

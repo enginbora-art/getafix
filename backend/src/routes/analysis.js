@@ -29,19 +29,39 @@ async function validateTicker(market, ticker) {
   }
 }
 
-// GET /api/analysis/requests  (?clear=true → delete all)
+// GET /api/analysis/requests  (?clear=true → delete own)
 router.get('/requests', authMiddleware, async (req, res) => {
   try {
     if (req.query.clear === 'true') {
       await prisma.manualRequest.deleteMany({ where: { userId: req.user.id } });
       return res.json([]);
     }
+    const isAdmin = req.user.role === 'ADMIN';
+    const where = isAdmin ? {} : { userId: req.user.id };
     const requests = await prisma.manualRequest.findMany({
-      where: { userId: req.user.id },
+      where,
+      include: isAdmin ? { user: { select: { id: true, name: true, email: true } } } : undefined,
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
     res.json(requests);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/analysis/requests/:id
+router.get('/requests/:id', authMiddleware, async (req, res) => {
+  try {
+    const request = await prisma.manualRequest.findUnique({
+      where: { id: req.params.id },
+      include: { user: { select: { id: true, name: true, email: true } } },
+    });
+    if (!request) return res.status(404).json({ error: 'İstek bulunamadı.' });
+    if (request.userId !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Erişim reddedildi.' });
+    }
+    res.json(request);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
