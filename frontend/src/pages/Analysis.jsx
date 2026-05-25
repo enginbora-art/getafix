@@ -1,15 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { Search, Clock, CheckCircle, XCircle, Loader, Trash2, ChevronLeft, ChevronRight, Eye, Download } from 'lucide-react'
 import { format } from 'date-fns'
 import { tr } from 'date-fns/locale'
 import api from '../lib/api'
 import { useAuth } from '../context/AuthContext'
-
-const stripJsonBlocks = (content) => (content || '').replace(/```json[\s\S]*?```/g, '').trim()
 
 const parseResultJson = (content) => {
   if (!content) return null
@@ -81,6 +77,26 @@ function PdfBtn({ reportId, market }) {
         : dlState === 'done'
         ? <><CheckCircle size={11} /> İndirildi</>
         : <><Download size={11} /> PDF</>}
+    </button>
+  )
+}
+
+function PortfolioBtn({ isInPortfolio, onClick }) {
+  const [hovered, setHovered] = useState(false)
+  const showExit = isInPortfolio && hovered
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+        background: showExit ? 'rgba(239,68,68,0.15)' : isInPortfolio ? 'rgba(45,212,191,0.15)' : 'rgba(255,255,255,0.06)',
+        border: `0.5px solid ${showExit ? '#ef4444' : isInPortfolio ? '#2dd4bf' : 'rgba(255,255,255,0.12)'}`,
+        color: showExit ? '#ef4444' : isInPortfolio ? '#2dd4bf' : '#94a3b8',
+      }}
+    >
+      {showExit ? 'Çıkar' : isInPortfolio ? '✓ Takipte' : '+ Takibe Al'}
     </button>
   )
 }
@@ -307,7 +323,6 @@ const HISTORY_PER_PAGE = 5
 // ─── Main Page ────────────────────────────────────────────────────
 export default function Analysis() {
   const navigate = useNavigate()
-  const [expandedId, setExpandedId] = useState(null)
   const [portfolioOverrides, setPortfolioOverrides] = useState({})
   const [historyPage, setHistoryPage] = useState(1)
   const qc = useQueryClient()
@@ -388,11 +403,8 @@ export default function Analysis() {
 
           return (
             <div key={req.id} className="glass p-4">
-              {/* Card header — clickable for DONE items */}
-              <div
-                className={`flex items-center justify-between ${isDone ? 'cursor-pointer' : ''}`}
-                onClick={isDone ? () => setExpandedId(expandedId === req.id ? null : req.id) : undefined}
-              >
+              {/* Card header */}
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className={`badge border ${req.market === 'BIST' ? 'text-teal-400 bg-teal-400/10 border-teal-400/20' : 'text-blue-400 bg-blue-400/10 border-blue-400/20'}`}>
                     {req.market}
@@ -465,62 +477,21 @@ export default function Analysis() {
                       )}
 
                       {/* Action buttons */}
-                      <div className="flex items-center gap-2 mt-3 flex-wrap" onClick={(e) => e.stopPropagation()}>
-                        {req.reportId && (
-                          <>
-                            <button
-                              onClick={() => navigate(`/reports/${req.reportId}`)}
-                              style={{
-                                display: 'inline-flex', alignItems: 'center', gap: 4,
-                                padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
-                                background: 'rgba(45,212,191,0.1)', border: '1px solid rgba(45,212,191,0.25)',
-                                color: '#2dd4bf',
-                              }}
-                            >
-                              <Eye size={11} /> Tam Rapor
-                            </button>
-                            <PdfBtn reportId={req.reportId} market={req.market} />
-                            <button
-                              onClick={() => togglePortfolio(req)}
-                              style={{
-                                padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
-                                background: isInPortfolio ? 'rgba(45,212,191,0.15)' : 'rgba(255,255,255,0.06)',
-                                border: `1px solid ${isInPortfolio ? 'rgba(45,212,191,0.4)' : 'rgba(255,255,255,0.12)'}`,
-                                color: isInPortfolio ? '#2dd4bf' : '#94a3b8',
-                              }}
-                            >
-                              {isInPortfolio ? '✓ Takipte' : '+ Takibe Al'}
-                            </button>
-                          </>
-                        )}
-                        <button
-                          onClick={() => setExpandedId(expandedId === req.id ? null : req.id)}
-                          style={{
-                            padding: '5px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
-                            background: 'none', border: 'none', color: '#64748b',
-                          }}
-                        >
-                          {expandedId === req.id ? 'Gizle ↑' : 'Tam Metin ↓'}
-                        </button>
-                      </div>
-
-                      {/* Expanded full markdown */}
-                      {expandedId === req.id && (
-                        <div className="mt-3 p-4 bg-white/5 rounded-lg prose prose-sm prose-invert max-w-none
-                          prose-headings:text-teal-400 prose-strong:text-white
-                          prose-table:w-full prose-table:border-collapse
-                          prose-th:border prose-th:border-white/10 prose-th:p-3 prose-th:text-left prose-th:bg-white/5
-                          prose-td:border prose-td:border-white/10 prose-td:p-3
-                          [&_h2:has(⚡)]:text-2xl [&_h2:has(⚡)]:font-black [&_h2:has(⚡)]:text-white">
-                          {req.currentPrice != null && (
-                            <p className="not-prose text-sm text-slate-400 mb-3">
-                              Analiz anı fiyatı:{' '}
-                              <span className="text-white font-semibold">
-                                {req.currentPrice.toFixed(2)} {currency}
-                              </span>
-                            </p>
-                          )}
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{stripJsonBlocks(req.result)}</ReactMarkdown>
+                      {req.reportId && (
+                        <div className="flex items-center gap-2 mt-3 flex-wrap">
+                          <button
+                            onClick={() => navigate(`/reports/${req.reportId}`)}
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                              background: 'rgba(45,212,191,0.1)', border: '1px solid rgba(45,212,191,0.25)',
+                              color: '#2dd4bf',
+                            }}
+                          >
+                            <Eye size={11} /> Tam Rapor
+                          </button>
+                          <PdfBtn reportId={req.reportId} market={req.market} />
+                          <PortfolioBtn isInPortfolio={isInPortfolio} onClick={() => togglePortfolio(req)} />
                         </div>
                       )}
                     </div>
