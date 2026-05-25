@@ -54,8 +54,17 @@ const analysisLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  message: { error: 'Çok fazla istek. 15 dakika bekleyin.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use('/api', globalLimiter);
 app.use('/api/auth/login', loginLimiter);
+app.use('/api/auth/forgot-password', forgotPasswordLimiter);
 app.use('/api/analysis/request', analysisLimiter);
 
 app.use('/api/auth', authRoutes);

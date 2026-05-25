@@ -1,8 +1,10 @@
+const crypto = require('crypto');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const authMiddleware = require('../middleware/auth');
 const prisma = require('../lib/prisma');
+const { sendPasswordResetEmail } = require('../services/email');
 
 const router = express.Router();
 
@@ -75,6 +77,77 @@ router.put('/change-password', authMiddleware, async (req, res) => {
       data: { password: hashed, mustChangePassword: false },
     });
     res.json({ message: 'Şifre güncellendi' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/forgot-password
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !isValidEmail(email)) {
+      return res.status(400).json({ error: 'Geçerli bir email adresi girin.' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      return res.json({ message: 'Şifre sıfırlama bağlantısı email adresinize gönderildi.' });
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiry = new Date(Date.now() + 60 * 60 * 1000);
+
+    await prisma.user.update({
+      where: { email },
+      data: { resetToken: token, resetTokenExpiry: expiry },
+    });
+
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+    await sendPasswordResetEmail({ to: email, name: user.name, resetUrl });
+
+    res.json({ message: 'Şifre sıfırlama bağlantısı email adresinize gönderildi.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/reset-password
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Token ve yeni şifre zorunlu.' });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        resetToken: token,
+        resetTokenExpiry: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Geçersiz veya süresi dolmuş link.' });
+    }
+
+    const pwError = validatePassword(newPassword);
+    if (pwError) return res.status(400).json({ error: pwError });
+
+    const hashed = await bcrypt.hash(newPassword, 12);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashed,
+        resetToken: null,
+        resetTokenExpiry: null,
+        mustChangePassword: false,
+      },
+    });
+
+    res.json({ message: 'Şifreniz başarıyla güncellendi.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

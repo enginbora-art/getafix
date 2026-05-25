@@ -200,7 +200,12 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1.5">Şifre</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-medium text-slate-400">Şifre</label>
+                <a href="/forgot-password" style={{ color: '#2dd4bf', fontSize: 12, textDecoration: 'none' }}>
+                  Şifremi unuttum
+                </a>
+              </div>
               <div className="relative">
                 <input
                   type={showPass ? 'text' : 'password'}

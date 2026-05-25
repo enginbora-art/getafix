@@ -141,4 +141,29 @@ Detaylar log dosyasında.`;
   );
 }
 
-module.exports = { sendForecastEmail, sendWelcomeEmail, sendErrorEmail };
+async function sendPasswordResetEmail({ to, name, resetUrl }) {
+  const markdownBody = `# Şifre Sıfırlama
+
+Merhaba ${name},
+
+Getafix hesabınız için şifre sıfırlama talebinde bulundunuz.
+
+Yeni şifrenizi belirlemek için aşağıdaki bağlantıya tıklayın:
+
+[Şifremi Sıfırla](${resetUrl})
+
+> Bu bağlantı **1 saat** geçerlidir.
+
+Eğer bu talebi siz yapmadıysanız bu emaili görmezden gelebilirsiniz.
+
+---
+Getafix — Yatırım tavsiyesi değildir. Karar destek aracıdır.`;
+
+  return sendMail({
+    to,
+    subject: 'Getafix — Şifre Sıfırlama',
+    markdownBody,
+  });
+}
+
+module.exports = { sendForecastEmail, sendWelcomeEmail, sendErrorEmail, sendPasswordResetEmail };

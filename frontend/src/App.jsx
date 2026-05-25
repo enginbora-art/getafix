@@ -8,6 +8,8 @@ import Dashboard from './pages/Dashboard'
 import Reports from './pages/Reports'
 import Analysis from './pages/Analysis'
 import ChangePassword from './pages/ChangePassword'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 import Portfolio from './pages/Portfolio'
 import AdminUsers from './pages/admin/Users'
 import AdminAgents from './pages/admin/Agents'
@@ -20,6 +22,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route index element={<Navigate to="/dashboard" replace />} />
