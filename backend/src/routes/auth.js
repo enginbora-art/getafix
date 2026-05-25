@@ -29,6 +29,15 @@ router.post('/login', async (req, res) => {
     if (!valid) {
       return res.status(401).json({ error: 'Email veya şifre hatalı' });
     }
+    const now = new Date();
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        lastLoginAt: now,
+        firstLoginAt: user.firstLoginAt ?? now,
+      },
+    });
+
     const token = signToken(user.id);
     res.json({
       token,

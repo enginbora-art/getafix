@@ -17,7 +17,7 @@ router.use(authMiddleware, requireAdmin);
 router.get('/users', async (req, res) => {
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true, firstLoginAt: true, lastLoginAt: true },
       orderBy: { createdAt: 'desc' },
     });
     res.json(users);

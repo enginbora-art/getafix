@@ -6,6 +6,13 @@ import { tr } from 'date-fns/locale'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../lib/api'
 
+function formatLoginDate(dateStr) {
+  const d = new Date(dateStr)
+  const date = d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })
+  const time = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+  return `${date}, ${time}`
+}
+
 function NewUserModal({ onClose }) {
   const [form, setForm] = useState({ email: '', name: '', role: 'USER' })
   const qc = useQueryClient()
@@ -226,7 +233,7 @@ export default function AdminUsers() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-white/10">
-              {['Ad', 'Email', 'Rol', 'Durum', 'Kayıt', 'İşlem'].map((h) => (
+              {['Ad', 'Email', 'Rol', 'Durum', 'Kayıt', 'İlk Giriş', 'Son Giriş', 'İşlem'].map((h) => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">{h}</th>
               ))}
             </tr>
@@ -252,6 +259,12 @@ export default function AdminUsers() {
                 </td>
                 <td className="px-4 py-3 text-xs text-slate-500">
                   {format(new Date(u.createdAt), 'dd MMM yyyy', { locale: tr })}
+                </td>
+                <td className="px-4 py-3 text-xs text-slate-500">
+                  {u.firstLoginAt ? formatLoginDate(u.firstLoginAt) : '—'}
+                </td>
+                <td className="px-4 py-3 text-xs text-slate-500">
+                  {u.lastLoginAt ? formatLoginDate(u.lastLoginAt) : '—'}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
