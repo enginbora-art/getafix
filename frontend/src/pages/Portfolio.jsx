@@ -180,6 +180,15 @@ export default function Portfolio() {
     }
   }
 
+  const removeFromPortfolio = async (reportId) => {
+    try {
+      await api.delete(`/reports/${reportId}/portfolio`)
+      fetchData()
+    } catch {
+      alert('İşlem başarısız.')
+    }
+  }
+
   const saveEntry = async (reportId) => {
     const val = parseFloat(editValue)
     if (!val || val <= 0) return
@@ -271,6 +280,7 @@ export default function Portfolio() {
                   <th className="text-right px-4 py-3">Güncel</th>
                   <th className="text-right px-4 py-3">Getiri %</th>
                   <th className="text-right px-4 py-3">Bildirim</th>
+                  <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody>
@@ -372,6 +382,23 @@ export default function Portfolio() {
                         ) : (
                           <span className="text-slate-700">—</span>
                         )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => removeFromPortfolio(p.reportId)}
+                          style={{
+                            background: 'rgba(239,68,68,0.08)',
+                            border: '0.5px solid rgba(239,68,68,0.3)',
+                            color: '#ef4444',
+                            borderRadius: '6px',
+                            padding: '4px 10px',
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Takibi Bırak
+                        </button>
                       </td>
                     </tr>
                   )

@@ -438,32 +438,17 @@ export default function Analysis() {
                       border: '1px solid rgba(255,255,255,0.08)',
                       borderRadius: 10, padding: '12px 14px',
                     }}>
-                      {/* Bias + Takibe Al row */}
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {bias && (
-                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-sm font-bold border ${BIAS_STYLE[bias] || 'text-slate-400 border-white/10'}`}>
-                              ⚡ {bias}
-                            </span>
-                          )}
-                          {req.currentPrice != null && (
-                            <span className="text-xs text-slate-500">
-                              Fiyat: <span className="text-slate-300">{req.currentPrice.toFixed(2)} {currency}</span>
-                            </span>
-                          )}
-                        </div>
-                        {req.reportId && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); togglePortfolio(req) }}
-                            style={{
-                              padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
-                              background: isInPortfolio ? 'rgba(45,212,191,0.15)' : 'rgba(255,255,255,0.06)',
-                              border: `1px solid ${isInPortfolio ? 'rgba(45,212,191,0.4)' : 'rgba(255,255,255,0.12)'}`,
-                              color: isInPortfolio ? '#2dd4bf' : '#94a3b8',
-                            }}
-                          >
-                            {isInPortfolio ? '✓ Takipte' : '+ Takibe Al'}
-                          </button>
+                      {/* Bias + price row */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {bias && (
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-sm font-bold border ${BIAS_STYLE[bias] || 'text-slate-400 border-white/10'}`}>
+                            ⚡ {bias}
+                          </span>
+                        )}
+                        {req.currentPrice != null && (
+                          <span className="text-xs text-slate-500">
+                            Fiyat: <span className="text-slate-300">{req.currentPrice.toFixed(2)} {currency}</span>
+                          </span>
                         )}
                       </div>
 
@@ -480,7 +465,7 @@ export default function Analysis() {
                       )}
 
                       {/* Action buttons */}
-                      <div className="flex items-center gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 mt-3 flex-wrap" onClick={(e) => e.stopPropagation()}>
                         {req.reportId && (
                           <>
                             <button
@@ -495,6 +480,17 @@ export default function Analysis() {
                               <Eye size={11} /> Tam Rapor
                             </button>
                             <PdfBtn reportId={req.reportId} market={req.market} />
+                            <button
+                              onClick={() => togglePortfolio(req)}
+                              style={{
+                                padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                                background: isInPortfolio ? 'rgba(45,212,191,0.15)' : 'rgba(255,255,255,0.06)',
+                                border: `1px solid ${isInPortfolio ? 'rgba(45,212,191,0.4)' : 'rgba(255,255,255,0.12)'}`,
+                                color: isInPortfolio ? '#2dd4bf' : '#94a3b8',
+                              }}
+                            >
+                              {isInPortfolio ? '✓ Takipte' : '+ Takibe Al'}
+                            </button>
                           </>
                         )}
                         <button
