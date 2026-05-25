@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { UserPlus, Trash2, Shield, User } from 'lucide-react'
+import { UserPlus, Trash2, Shield, User, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { tr } from 'date-fns/locale'
+import { useAuth } from '../../context/AuthContext'
 import api from '../../lib/api'
 
 function NewUserModal({ onClose }) {
@@ -49,8 +50,152 @@ function NewUserModal({ onClose }) {
   )
 }
 
+function ManageModal({ targetUser, onClose }) {
+  const { user: currentUser } = useAuth()
+  const qc = useQueryClient()
+  const isSelf = currentUser?.id === targetUser.id
+
+  const [selectedRole, setSelectedRole] = useState(targetUser.role)
+  const [roleMsg, setRoleMsg] = useState(null)
+  const [pwMsg, setPwMsg] = useState(null)
+  const [roleLoading, setRoleLoading] = useState(false)
+  const [pwLoading, setPwLoading] = useState(false)
+
+  // ESC to close
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  const handleRoleUpdate = async () => {
+    if (isSelf) return
+    setRoleLoading(true)
+    setRoleMsg(null)
+    try {
+      await api.patch(`/admin/users/${targetUser.id}`, { role: selectedRole })
+      qc.invalidateQueries({ queryKey: ['admin-users'] })
+      setRoleMsg({ type: 'ok', text: '✓ Rol güncellendi' })
+      setTimeout(() => setRoleMsg(null), 2000)
+    } catch (err) {
+      setRoleMsg({ type: 'err', text: err.response?.data?.error || 'Hata oluştu' })
+    } finally {
+      setRoleLoading(false)
+    }
+  }
+
+  const handleResetPassword = async () => {
+    setPwLoading(true)
+    setPwMsg(null)
+    try {
+      await api.post(`/admin/users/${targetUser.id}/reset-password`)
+      setPwMsg({ type: 'ok', text: '✓ Geçici şifre gönderildi' })
+      setTimeout(() => setPwMsg(null), 3000)
+    } catch (err) {
+      setPwMsg({ type: 'err', text: err.response?.data?.error || 'Hata oluştu' })
+    } finally {
+      setPwLoading(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backdropFilter: 'blur(4px)', background: 'rgba(0,0,0,0.6)' }}
+      onClick={onClose}
+    >
+      <div
+        className="glass w-full max-w-md rounded-2xl p-6 relative"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between mb-5">
+          <div>
+            <h3 className="text-lg font-semibold text-white">
+              Kullanıcı Yönetimi — {targetUser.name}
+            </h3>
+            <p className="text-sm text-slate-500 mt-0.5">{targetUser.email}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-500 hover:text-white transition-colors ml-4 shrink-0"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Section 1 — Role */}
+        <div className="space-y-3">
+          <label className="block text-sm font-medium text-slate-400">Rol</label>
+
+          {isSelf && (
+            <p className="text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-2">
+              Kendi rolünüzü değiştiremezsiniz.
+            </p>
+          )}
+
+          <select
+            value={selectedRole}
+            onChange={(e) => setSelectedRole(e.target.value)}
+            disabled={isSelf}
+            className="w-full px-3 py-2 bg-navy-800 border border-white/10 rounded-lg text-slate-100 focus:outline-none focus:border-teal-500 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <option value="USER">USER</option>
+            <option value="ADMIN">ADMIN</option>
+          </select>
+
+          <button
+            onClick={handleRoleUpdate}
+            disabled={isSelf || roleLoading || selectedRole === targetUser.role}
+            className="w-full btn-primary py-2 text-sm disabled:opacity-40"
+          >
+            {roleLoading ? 'Kaydediliyor...' : 'Rolü Güncelle'}
+          </button>
+
+          {roleMsg && (
+            <p className={`text-sm ${roleMsg.type === 'ok' ? 'text-green-400' : 'text-red-400'}`}>
+              {roleMsg.text}
+            </p>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="my-5 border-t border-white/10" />
+
+        {/* Section 2 — Reset password */}
+        <div className="space-y-3">
+          <label className="block text-sm font-medium text-slate-400">Şifre Sıfırlama</label>
+          <p className="text-xs text-slate-500">
+            Kullanıcıya yeni geçici şifre gönder. Giriş yaptığında şifre değiştirmesi istenir.
+          </p>
+
+          <button
+            onClick={handleResetPassword}
+            disabled={pwLoading}
+            className="w-full py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-40"
+            style={{
+              background: 'rgba(245,158,11,0.15)',
+              border: '1px solid rgba(245,158,11,0.3)',
+              color: '#fbbf24',
+            }}
+          >
+            {pwLoading ? 'Gönderiliyor...' : 'Şifre Sıfırla ve Mail Gönder'}
+          </button>
+
+          {pwMsg && (
+            <p className={`text-sm ${pwMsg.type === 'ok' ? 'text-green-400' : 'text-red-400'}`}>
+              {pwMsg.text}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminUsers() {
-  const [showModal, setShowModal] = useState(false)
+  const [showNewModal, setShowNewModal] = useState(false)
+  const [manageTarget, setManageTarget] = useState(null)
   const qc = useQueryClient()
 
   const { data: users = [] } = useQuery({
@@ -63,11 +208,6 @@ export default function AdminUsers() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
   })
 
-  const changeRole = useMutation({
-    mutationFn: ({ id, role }) => api.patch(`/admin/users/${id}`, { role }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
-  })
-
   const del = useMutation({
     mutationFn: (id) => api.delete(`/admin/users/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
@@ -77,7 +217,7 @@ export default function AdminUsers() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-white">Kullanıcı Yönetimi</h1>
-        <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2">
+        <button onClick={() => setShowNewModal(true)} className="btn-primary flex items-center gap-2">
           <UserPlus size={16} /> Yeni Kullanıcı
         </button>
       </div>
@@ -97,17 +237,16 @@ export default function AdminUsers() {
                 <td className="px-4 py-3 text-sm text-slate-200 font-medium">{u.name}</td>
                 <td className="px-4 py-3 text-sm text-slate-400">{u.email}</td>
                 <td className="px-4 py-3">
-                  <button
-                    onClick={() => changeRole.mutate({ id: u.id, role: u.role === 'ADMIN' ? 'USER' : 'ADMIN' })}
-                    className={`badge border gap-1 cursor-pointer ${u.role === 'ADMIN' ? 'text-purple-400 bg-purple-400/10 border-purple-400/20' : 'text-slate-400 bg-white/5 border-white/10'}`}
-                  >
+                  <span className={`badge border gap-1 ${u.role === 'ADMIN' ? 'text-purple-400 bg-purple-400/10 border-purple-400/20' : 'text-slate-400 bg-white/5 border-white/10'}`}>
                     {u.role === 'ADMIN' ? <Shield size={11} /> : <User size={11} />}
                     {u.role}
-                  </button>
+                  </span>
                 </td>
                 <td className="px-4 py-3">
-                  <button onClick={() => toggle.mutate({ id: u.id, isActive: !u.isActive })}
-                    className={`badge border cursor-pointer ${u.isActive ? 'text-green-400 bg-green-400/10 border-green-400/20' : 'text-slate-500 bg-white/5 border-white/10'}`}>
+                  <button
+                    onClick={() => toggle.mutate({ id: u.id, isActive: !u.isActive })}
+                    className={`badge border cursor-pointer ${u.isActive ? 'text-green-400 bg-green-400/10 border-green-400/20' : 'text-slate-500 bg-white/5 border-white/10'}`}
+                  >
                     {u.isActive ? 'Aktif' : 'Pasif'}
                   </button>
                 </td>
@@ -115,10 +254,24 @@ export default function AdminUsers() {
                   {format(new Date(u.createdAt), 'dd MMM yyyy', { locale: tr })}
                 </td>
                 <td className="px-4 py-3">
-                  <button onClick={() => { if (confirm('Emin misiniz?')) del.mutate(u.id) }}
-                    className="text-slate-600 hover:text-red-400 transition-colors">
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setManageTarget(u)}
+                      style={{
+                        color: '#2dd4bf', fontSize: 12, background: 'none',
+                        border: '0.5px solid rgba(45,212,191,0.3)',
+                        borderRadius: 4, padding: '3px 8px', cursor: 'pointer',
+                      }}
+                    >
+                      Yönet
+                    </button>
+                    <button
+                      onClick={() => { if (confirm('Emin misiniz?')) del.mutate(u.id) }}
+                      className="text-slate-600 hover:text-red-400 transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -126,7 +279,13 @@ export default function AdminUsers() {
         </table>
       </div>
 
-      {showModal && <NewUserModal onClose={() => setShowModal(false)} />}
+      {showNewModal && <NewUserModal onClose={() => setShowNewModal(false)} />}
+      {manageTarget && (
+        <ManageModal
+          targetUser={manageTarget}
+          onClose={() => setManageTarget(null)}
+        />
+      )}
     </div>
   )
 }

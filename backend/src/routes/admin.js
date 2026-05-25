@@ -57,6 +57,9 @@ router.post('/users', async (req, res) => {
 router.patch('/users/:id', async (req, res) => {
   try {
     const { isActive, role } = req.body;
+    if (role !== undefined && req.user.id === req.params.id) {
+      return res.status(400).json({ error: 'Kendi rolünüzü değiştiremezsiniz.' });
+    }
     if (role !== undefined && !VALID_ROLES.includes(role)) {
       return res.status(400).json({ error: 'Geçersiz rol.' });
     }
@@ -70,6 +73,30 @@ router.patch('/users/:id', async (req, res) => {
       select: { id: true, email: true, name: true, role: true, isActive: true },
     });
     res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/users/:id/reset-password
+router.post('/users/:id/reset-password', async (req, res) => {
+  try {
+    const target = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!target) return res.status(404).json({ error: 'Kullanıcı bulunamadı.' });
+
+    const tempPassword = crypto.randomBytes(8).toString('base64url').slice(0, 12);
+    const hashed = await bcrypt.hash(tempPassword, 12);
+
+    await prisma.user.update({
+      where: { id: req.params.id },
+      data: { password: hashed, mustChangePassword: true },
+    });
+
+    sendWelcomeEmail({ to: target.email, name: target.name, tempPassword }).catch((err) =>
+      console.error('[admin] Şifre sıfırlama maili gönderilemedi:', err.message),
+    );
+
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
