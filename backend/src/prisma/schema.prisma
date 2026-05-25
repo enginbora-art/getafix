@@ -38,9 +38,10 @@ model Report {
   stopLoss    Float?
   targetShort Float?
   targetMid   Float?
-  riskLevel   String?
-  isClosing   Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  riskLevel      String?
+  isClosing      Boolean  @default(false)
+  userEntryPrice Float?
+  createdAt      DateTime @default(now())
 }
 
 enum Market {

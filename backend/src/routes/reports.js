@@ -58,7 +58,8 @@ router.get('/portfolio', authMiddleware, async (req, res) => {
       select: {
         id: true, market: true, createdAt: true, ticker: true,
         entryLow: true, entryHigh: true, stopLoss: true,
-        targetShort: true, targetMid: true, riskLevel: true, content: true,
+        targetShort: true, targetMid: true, riskLevel: true,
+        userEntryPrice: true, content: true,
       },
     });
 
@@ -95,33 +96,56 @@ router.get('/portfolio', authMiddleware, async (req, res) => {
           ? (r.entryLow + r.entryHigh) / 2
           : (r.entryLow ?? r.entryHigh ?? null);
 
+      const effectiveEntry = r.userEntryPrice || entryPrice;
+
       const returnShort =
-        entryPrice && r.currentPrice != null
-          ? parseFloat(((r.currentPrice - entryPrice) / entryPrice * 100).toFixed(2))
+        r.targetShort != null && r.currentPrice != null
+          ? parseFloat(((r.targetShort - r.currentPrice) / r.currentPrice * 100).toFixed(2))
           : null;
 
-      const returnVsT1 =
-        entryPrice && r.targetShort != null
-          ? parseFloat(((r.targetShort - entryPrice) / entryPrice * 100).toFixed(2))
+      const returnMid =
+        r.targetMid != null && r.currentPrice != null
+          ? parseFloat(((r.targetMid - r.currentPrice) / r.currentPrice * 100).toFixed(2))
           : null;
 
       return {
+        reportId: r.id,
         ticker: r.ticker,
         market: r.market,
         reportDate: r.createdAt,
         bias: parseBias(r.content),
         entryPrice,
+        effectiveEntry,
+        userEntryPrice: r.userEntryPrice,
         target1: r.targetShort,
         target2: r.targetMid,
         stopLoss: r.stopLoss,
         riskLevel: r.riskLevel,
         currentPrice: r.currentPrice ?? null,
         returnShort,
-        returnVsT1,
+        returnMid,
       };
     });
 
     res.json({ positions });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/reports/:id/entry
+router.put('/:id/entry', authMiddleware, async (req, res) => {
+  try {
+    const { entryPrice } = req.body;
+    const val = parseFloat(entryPrice);
+    if (!entryPrice || isNaN(val) || val <= 0) {
+      return res.status(400).json({ error: 'Geçerli bir fiyat girin.' });
+    }
+    const report = await prisma.report.update({
+      where: { id: req.params.id },
+      data: { userEntryPrice: val },
+    });
+    res.json({ ok: true, userEntryPrice: report.userEntryPrice });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

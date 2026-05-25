@@ -18,16 +18,32 @@ function BiasTag({ bias }) {
   )
 }
 
-function ReturnCell({ value, alwaysTeal }) {
+function H1Cell({ value }) {
   if (value == null) return <span className="text-slate-500">—</span>
-  if (alwaysTeal) return <span className="text-teal-400 font-medium">{value > 0 ? '+' : ''}{value}%</span>
   if (value > 0) return <span className="text-green-400 font-medium">+{value}%</span>
-  return <span className="text-red-400 font-medium">{value}%</span>
+  return <span className="text-slate-500 font-medium">{value}%</span>
+}
+
+function H2Cell({ value }) {
+  if (value == null) return <span className="text-slate-500">—</span>
+  if (value > 0) return <span className="text-teal-400 font-medium">+{value}%</span>
+  return <span className="text-slate-500 font-medium">{value}%</span>
 }
 
 function PriceCell({ value, currency }) {
   if (value == null) return <span className="text-slate-500">—</span>
   return <span className="text-slate-200">{value.toFixed(2)} {currency}</span>
+}
+
+function Tooltip({ text }) {
+  return (
+    <span
+      className="ml-1 text-slate-600 cursor-help"
+      title={text}
+    >
+      ℹ
+    </span>
+  )
 }
 
 export default function Portfolio() {
@@ -36,6 +52,8 @@ export default function Portfolio() {
   const [error, setError] = useState('')
   const [lastUpdated, setLastUpdated] = useState(null)
   const [activeTab, setActiveTab] = useState('BIST')
+  const [editingId, setEditingId] = useState(null)
+  const [editValue, setEditValue] = useState('')
 
   const fetchData = useCallback(async () => {
     try {
@@ -55,6 +73,18 @@ export default function Portfolio() {
     const id = setInterval(fetchData, 60_000)
     return () => clearInterval(id)
   }, [fetchData])
+
+  const saveEntry = async (reportId) => {
+    const val = parseFloat(editValue)
+    if (!val || val <= 0) return
+    try {
+      await api.put(`/reports/${reportId}/entry`, { entryPrice: val })
+      setEditingId(null)
+      fetchData()
+    } catch (err) {
+      console.error(err)
+    }
+  }
 
   const filtered = positions.filter((p) => p.market === activeTab)
 
@@ -128,21 +158,32 @@ export default function Portfolio() {
                   <th className="text-left px-4 py-3">Hisse</th>
                   <th className="text-left px-4 py-3">Tarih</th>
                   <th className="text-left px-4 py-3">Karar</th>
-                  <th className="text-right px-4 py-3">Giriş</th>
+                  <th className="text-right px-4 py-3">
+                    <span>Giriş</span>
+                    <span className="ml-1 text-slate-600 font-normal normal-case">✎</span>
+                    <div className="text-slate-700 font-normal normal-case" style={{ fontSize: 9 }}>tıkla düzenle</div>
+                  </th>
                   <th className="text-right px-4 py-3">Stop</th>
                   <th className="text-right px-4 py-3">H1 (Kısa)</th>
                   <th className="text-right px-4 py-3">H2 (Orta)</th>
                   <th className="text-right px-4 py-3">Güncel</th>
-                  <th className="text-right px-4 py-3">Anlık Getiri</th>
-                  <th className="text-right px-4 py-3">Potansiyel</th>
+                  <th className="text-right px-4 py-3">
+                    H1 Potansiyel
+                    <Tooltip text="Güncel fiyattan H1 hedefine kalan %" />
+                  </th>
+                  <th className="text-right px-4 py-3">
+                    H2 Potansiyel
+                    <Tooltip text="Güncel fiyattan H2 hedefine kalan %" />
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((p) => {
                   const currency = p.market === 'BIST' ? 'TL' : '$'
+                  const isEditing = editingId === p.reportId
                   return (
                     <tr
-                      key={p.ticker}
+                      key={p.reportId}
                       className={`border-b border-white/5 hover:bg-white/5 transition-colors ${rowBg(p)}`}
                     >
                       <td className="px-4 py-3">
@@ -154,9 +195,50 @@ export default function Portfolio() {
                       <td className="px-4 py-3">
                         <BiasTag bias={p.bias} />
                       </td>
+
+                      {/* Editable entry price cell */}
                       <td className="px-4 py-3 text-right">
-                        <PriceCell value={p.entryPrice} currency={currency} />
+                        {isEditing ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <input
+                              type="number"
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') saveEntry(p.reportId)
+                                if (e.key === 'Escape') setEditingId(null)
+                              }}
+                              style={{
+                                width: 80, padding: '3px 6px',
+                                background: 'rgba(255,255,255,0.1)',
+                                border: '1px solid #2dd4bf', borderRadius: 4,
+                                color: 'white', fontSize: 12,
+                              }}
+                            />
+                            <button
+                              onClick={() => saveEntry(p.reportId)}
+                              style={{ color: '#2dd4bf', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer' }}
+                            >✓</button>
+                            <button
+                              onClick={() => setEditingId(null)}
+                              style={{ color: '#64748b', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer' }}
+                            >✗</button>
+                          </div>
+                        ) : (
+                          <span
+                            onClick={() => { setEditingId(p.reportId); setEditValue(p.effectiveEntry ?? '') }}
+                            title="Tıkla ve gerçek alış fiyatını gir"
+                            style={{ cursor: 'pointer', borderBottom: '1px dashed #334155', paddingBottom: 1 }}
+                          >
+                            {p.effectiveEntry != null
+                              ? `${p.effectiveEntry.toFixed(2)} ${currency}`
+                              : <span style={{ color: '#475569' }}>—</span>
+                            }
+                          </span>
+                        )}
                       </td>
+
                       <td className="px-4 py-3 text-right">
                         <PriceCell value={p.stopLoss} currency={currency} />
                       </td>
@@ -170,10 +252,10 @@ export default function Portfolio() {
                         <PriceCell value={p.currentPrice} currency={currency} />
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <ReturnCell value={p.returnShort} />
+                        <H1Cell value={p.returnShort} />
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <ReturnCell value={p.returnVsT1} alwaysTeal />
+                        <H2Cell value={p.returnMid} />
                       </td>
                     </tr>
                   )
