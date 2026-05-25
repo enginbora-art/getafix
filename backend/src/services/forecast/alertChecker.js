@@ -39,4 +39,32 @@ async function checkPortfolioAlerts(market, newReport) {
   }
 }
 
-module.exports = { checkPortfolioAlerts };
+async function parseAndSaveKapNotices(sentOutput, market, reportId) {
+  try {
+    const kapMatch = sentOutput.match(/```kap\n([\s\S]*?)\n```/);
+    if (!kapMatch) return;
+
+    const notices = JSON.parse(kapMatch[1]);
+    if (!Array.isArray(notices) || notices.length === 0) return;
+
+    for (const notice of notices) {
+      if (!notice.ticker || !notice.title || !notice.summary) continue;
+      await prisma.kapNotice.create({
+        data: {
+          ticker: notice.ticker,
+          market,
+          title: notice.title,
+          summary: notice.summary,
+          impact: notice.impact || 'NOTR',
+          sourceDate: notice.sourceDate ? new Date(notice.sourceDate) : null,
+          reportId: reportId || null,
+        },
+      });
+      console.log(`[KAP] ${notice.ticker}: ${notice.title}`);
+    }
+  } catch (err) {
+    console.error('[KAP] Parse hatası:', err.message);
+  }
+}
+
+module.exports = { checkPortfolioAlerts, parseAndSaveKapNotices };

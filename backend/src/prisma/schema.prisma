@@ -49,6 +49,7 @@ model Report {
   userEntryPrice Float?
   createdAt      DateTime @default(now())
   alerts         PortfolioAlert[]
+  kapNotices     KapNotice[]
 }
 
 model PortfolioAlert {
@@ -134,6 +135,19 @@ model SystemRun {
   error       String?
   userId      String?
   user        User?     @relation(fields: [userId], references: [id])
+}
+
+model KapNotice {
+  id         String    @id @default(cuid())
+  ticker     String
+  market     Market
+  title      String
+  summary    String    @db.Text
+  impact     String
+  sourceDate DateTime?
+  createdAt  DateTime  @default(now())
+  reportId   String?
+  report     Report?   @relation(fields: [reportId], references: [id])
 }
 
 enum RequestStatus {

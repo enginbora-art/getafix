@@ -4,7 +4,7 @@ const { prefilterUs, getUsFilters } = require('./screener');
 const { sendForecastEmail } = require('../email');
 const prisma = require('../../lib/prisma');
 const { logUsage, calculateCost } = require('../../lib/costTracker');
-const { checkPortfolioAlerts } = require('./alertChecker');
+const { checkPortfolioAlerts, parseAndSaveKapNotices } = require('./alertChecker');
 
 // S&P 500 Core + S&P 400 Mid Cap + Russell Liquid — sp500_russell.txt ile senkronize
 const US_WATCHLIST = [
@@ -253,7 +253,7 @@ function buildUsFundPrompt(stockBlock, todayStr) {
 }
 
 function buildUsSentPrompt(stockBlock, todayStr) {
-  return `Today is ${todayStr}. Find news, catalysts, and sentiment for:\n\n${stockBlock}\n\nFor each stock: IGNITION / NEUTRAL / HEADWIND + specific catalyst. Mark unverified info as RUMOR.`;
+  return `Today is ${todayStr}. Find news, catalysts, and sentiment for:\n\n${stockBlock}\n\nFor each stock: IGNITION / NEUTRAL / HEADWIND + specific catalyst. Mark unverified info as RUMOR.\n\nIMPORTANT: If you find significant filings or events for any stock in the last 7 days (SEC filings, earnings announcements, insider buying/selling, major contracts, M&A activity, management changes, dividend declarations, guidance updates), append this block at the END of your report:\n\n\`\`\`kap\n[\n  {\n    "ticker": "AAPL",\n    "title": "Q2 Earnings Beat Expectations",\n    "summary": "Apple reported Q2 EPS of $1.53 vs $1.43 expected. Revenue grew 5% YoY driven by services.",\n    "impact": "POZITIF",\n    "sourceDate": "2026-05-24"\n  }\n]\n\`\`\`\n\nimpact values: "POZITIF" | "NEGATIF" | "NOTR". Only include material events. Skip routine or immaterial filings.`;
 }
 
 async function runUsForecast(isClosing = false) {
@@ -344,6 +344,7 @@ async function runUsForecast(isClosing = false) {
   });
   console.log(`[US] Rapor kaydedildi — ID: ${report.id}`);
   await checkPortfolioAlerts('US', report);
+  await parseAndSaveKapNotices(r1sent.text, 'US', report.id);
 
   await sendForecastEmail(managerOut, 'US', now);
   console.log(`[US] Tamamlandı — toplam süre: ${Math.round((Date.now() - t0) / 1000)}s`);

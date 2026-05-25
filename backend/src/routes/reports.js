@@ -151,6 +151,29 @@ router.get('/alerts', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/reports/kap-notices?market=BIST|US&page=1&limit=10
+router.get('/kap-notices', authMiddleware, async (req, res) => {
+  try {
+    const { market, page = 1, limit = 10 } = req.query;
+    const where = {};
+    if (market && ['BIST', 'US'].includes(market)) where.market = market;
+    const take = Math.min(parseInt(limit), 50);
+    const skip = (parseInt(page) - 1) * take;
+    const [total, notices] = await Promise.all([
+      prisma.kapNotice.count({ where }),
+      prisma.kapNotice.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+    ]);
+    res.json({ total, page: parseInt(page), totalPages: Math.ceil(total / take), notices });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // PUT /api/reports/alerts/read-all
 router.put('/alerts/read-all', authMiddleware, async (req, res) => {
   try {
