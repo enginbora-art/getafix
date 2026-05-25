@@ -20,8 +20,9 @@ model User {
   lastLoginAt         DateTime?
   createdAt           DateTime @default(now())
   updatedAt DateTime @updatedAt
-  requests  ManualRequest[]
+  requests    ManualRequest[]
   apiUsageLogs ApiUsageLog[]
+  systemRuns  SystemRun[]
 }
 
 enum Role {
@@ -105,6 +106,17 @@ model ApiUsageLog {
   costUsd      Float
   ticker       String?
   createdAt    DateTime @default(now())
+}
+
+model SystemRun {
+  id          String    @id @default(cuid())
+  market      Market
+  status      String    @default("RUNNING")
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  error       String?
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id])
 }
 
 enum RequestStatus {

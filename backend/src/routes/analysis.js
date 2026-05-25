@@ -166,4 +166,82 @@ async function processManualRequest(requestId) {
   }
 }
 
+// POST /api/analysis/run-system
+router.post('/run-system', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Sadece admin çalıştırabilir.' });
+    }
+    const { market } = req.body;
+    if (!['BIST', 'US'].includes(market)) {
+      return res.status(400).json({ error: 'Geçersiz market.' });
+    }
+
+    const existing = await prisma.systemRun.findFirst({
+      where: { market, status: 'RUNNING' },
+    });
+    if (existing) {
+      return res.status(409).json({ error: 'Sistem zaten çalışıyor.' });
+    }
+
+    const systemRun = await prisma.systemRun.create({
+      data: { market, status: 'RUNNING', userId: req.user.id },
+    });
+
+    res.json({ ok: true, runId: systemRun.id, message: 'Sistem başlatıldı.' });
+
+    const { runBistForecast } = require('../services/forecast/bist');
+    const { runUsForecast } = require('../services/forecast/us');
+    const run = market === 'BIST' ? runBistForecast : runUsForecast;
+
+    run(true).then(() =>
+      prisma.systemRun.update({
+        where: { id: systemRun.id },
+        data: { status: 'DONE', endedAt: new Date() },
+      })
+    ).catch((err) =>
+      prisma.systemRun.update({
+        where: { id: systemRun.id },
+        data: { status: 'FAILED', error: err.message, endedAt: new Date() },
+      })
+    );
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/analysis/system-status?market=BIST|US
+router.get('/system-status', authMiddleware, async (req, res) => {
+  try {
+    const { market } = req.query;
+    if (!['BIST', 'US'].includes(market)) {
+      return res.status(400).json({ error: 'Geçersiz market.' });
+    }
+
+    const run = await prisma.systemRun.findFirst({
+      where: { market },
+      orderBy: { startedAt: 'desc' },
+      include: { user: { select: { name: true, email: true } } },
+    });
+
+    if (!run) return res.json({ status: null });
+
+    const duration =
+      run.endedAt
+        ? Math.round((new Date(run.endedAt) - new Date(run.startedAt)) / 1000)
+        : null;
+
+    res.json({
+      status: run.status,
+      startedAt: run.startedAt,
+      endedAt: run.endedAt,
+      duration,
+      triggeredBy: run.user,
+      error: run.error,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
