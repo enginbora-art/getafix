@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Search, Clock, CheckCircle, XCircle, Loader, Trash2 } from 'lucide-react'
+import { Search, Clock, CheckCircle, XCircle, Loader, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { format } from 'date-fns'
 import { tr } from 'date-fns/locale'
 import api from '../lib/api'
@@ -170,7 +170,7 @@ function SystemRunSection({ market, isAdmin }) {
 }
 
 // ─── Single Ticker Form ───────────────────────────────────────────
-function MarketForm({ market, label, placeholder }) {
+function MarketForm({ market, label, placeholder, onRequestSent }) {
   const [ticker, setTicker] = useState('')
   const [scenario, setScenario] = useState('')
   const [tickerError, setTickerError] = useState(null)
@@ -183,6 +183,7 @@ function MarketForm({ market, label, placeholder }) {
       setScenario('')
       setTickerError(null)
       qc.invalidateQueries({ queryKey: ['analysis-requests'] })
+      onRequestSent?.()
     },
     onError: (err) => {
       const data = err.response?.data
@@ -198,61 +199,64 @@ function MarketForm({ market, label, placeholder }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-2">
       <div>
-        <label className="block text-sm font-medium text-slate-400 mb-1.5">Hisse</label>
+        <label className="block text-xs font-medium text-slate-400 mb-1">Hisse</label>
         <input
           value={ticker}
           onChange={(e) => setTicker(normalizeTicker(e.target.value))}
           placeholder={placeholder}
-          className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-slate-100 placeholder-slate-600 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
         />
-        {tickerError && <p className="text-red-400 text-sm mt-1.5">⚠️ {tickerError}</p>}
+        {tickerError && <p className="text-red-400 text-xs mt-1">⚠️ {tickerError}</p>}
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-400 mb-1.5">
-          Senaryo / Ek Bağlam <span className="text-slate-600 font-normal">(opsiyonel)</span>
+        <label className="block text-xs font-medium text-slate-400 mb-1">
+          Senaryo <span className="text-slate-600 font-normal">(opsiyonel)</span>
         </label>
         <textarea
           value={scenario}
           onChange={(e) => setScenario(e.target.value)}
           placeholder="Örn: Hürmüz Boğazı barış süreci etkisini değerlendir..."
-          rows={3}
+          rows={2}
           maxLength={500}
-          className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-slate-100 placeholder-slate-600 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 resize-none text-sm"
+          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 resize-none"
         />
-        <p className="text-xs text-slate-600 text-right mt-1">{scenario.length}/500</p>
+        <p className="text-xs text-slate-600 text-right mt-0.5">{scenario.length}/500</p>
       </div>
       <button
         type="submit"
         disabled={isPending || !ticker.trim()}
-        className="btn-primary flex items-center gap-2 disabled:opacity-50"
+        className="btn-primary flex items-center gap-2 text-sm py-2 px-4 disabled:opacity-50"
       >
-        <Search size={16} /> {isPending ? 'Gönderiliyor...' : 'Analiz Et'}
+        <Search size={14} /> {isPending ? 'Gönderiliyor...' : 'Analiz Et'}
       </button>
     </form>
   )
 }
 
 // ─── Combined Panel ───────────────────────────────────────────────
-function MarketPanel({ market, label, placeholder, isAdmin }) {
+function MarketPanel({ market, label, placeholder, isAdmin, onRequestSent }) {
   return (
-    <div className="glass p-6 flex-1">
-      <h2 className="text-lg font-semibold text-white mb-4">{label}</h2>
+    <div className="glass p-4 flex-1">
+      <h2 className="text-base font-medium text-white mb-3">{label}</h2>
       <SystemRunSection market={market} isAdmin={isAdmin} />
-      <div className="flex items-center gap-3 my-4">
+      <div className="flex items-center gap-3 my-3">
         <div className="flex-1 h-px bg-white/5" />
         <span className="text-xs text-slate-600">veya tek hisse</span>
         <div className="flex-1 h-px bg-white/5" />
       </div>
-      <MarketForm market={market} label={label} placeholder={placeholder} />
+      <MarketForm market={market} label={label} placeholder={placeholder} onRequestSent={onRequestSent} />
     </div>
   )
 }
 
+const HISTORY_PER_PAGE = 5
+
 // ─── Main Page ────────────────────────────────────────────────────
 export default function Analysis() {
   const [selected, setSelected] = useState(null)
+  const [historyPage, setHistoryPage] = useState(1)
   const qc = useQueryClient()
   const { user } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
@@ -268,19 +272,26 @@ export default function Analysis() {
     },
   })
 
+  const totalHistoryPages = Math.max(1, Math.ceil(requests.length / HISTORY_PER_PAGE))
+  const pagedRequests = requests.slice(
+    (historyPage - 1) * HISTORY_PER_PAGE,
+    historyPage * HISTORY_PER_PAGE
+  )
+
   const handleClear = async () => {
     if (!confirm('Tüm istek geçmişi silinecek. Emin misiniz?')) return
     await api.get('/analysis/requests?clear=true')
     qc.invalidateQueries({ queryKey: ['analysis-requests'] })
+    setHistoryPage(1)
   }
 
   return (
     <div className="p-4 md:p-8">
       <h1 className="text-2xl font-bold text-white mb-6">Manuel Analiz</h1>
 
-      <div className="flex flex-col sm:flex-row gap-4 mb-8">
-        <MarketPanel market="BIST" label="BIST Hisse Analizi" placeholder="Örn: THYAO" isAdmin={isAdmin} />
-        <MarketPanel market="US"   label="US Hisse Analizi"   placeholder="Örn: NVDA"  isAdmin={isAdmin} />
+      <div className="flex flex-col sm:flex-row gap-3 mb-8">
+        <MarketPanel market="BIST" label="BIST Hisse Analizi" placeholder="Örn: THYAO" isAdmin={isAdmin} onRequestSent={() => setHistoryPage(1)} />
+        <MarketPanel market="US"   label="US Hisse Analizi"   placeholder="Örn: NVDA"  isAdmin={isAdmin} onRequestSent={() => setHistoryPage(1)} />
       </div>
 
       <div className="flex items-center justify-between mb-4">
@@ -295,11 +306,11 @@ export default function Analysis() {
         )}
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-3" id="history-list">
         {requests.length === 0 && (
           <div className="glass p-6 text-center text-slate-500">Henüz analiz isteği bulunmuyor</div>
         )}
-        {requests.map((req) => {
+        {pagedRequests.map((req) => {
           const s = STATUS_CONFIG[req.status] || STATUS_CONFIG.PENDING
           const SIcon = s.Icon
           const isProcessing = req.status === 'PROCESSING'
@@ -371,6 +382,28 @@ export default function Analysis() {
           )
         })}
       </div>
+
+      {requests.length > HISTORY_PER_PAGE && (
+        <div className="flex items-center justify-center gap-3 mt-4">
+          <button
+            onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+            disabled={historyPage === 1}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft size={15} /> Önceki
+          </button>
+          <span className="text-sm text-slate-500">
+            Sayfa {historyPage} / {totalHistoryPages}
+          </span>
+          <button
+            onClick={() => setHistoryPage(p => Math.min(totalHistoryPages, p + 1))}
+            disabled={historyPage === totalHistoryPages}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            Sonraki <ChevronRight size={15} />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
