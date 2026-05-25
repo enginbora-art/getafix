@@ -4,6 +4,7 @@ const { prefilterUs, getUsFilters } = require('./screener');
 const { sendForecastEmail } = require('../email');
 const prisma = require('../../lib/prisma');
 const { logUsage, calculateCost } = require('../../lib/costTracker');
+const { checkPortfolioAlerts } = require('./alertChecker');
 
 // S&P 500 Core + S&P 400 Mid Cap + Russell Liquid — sp500_russell.txt ile senkronize
 const US_WATCHLIST = [
@@ -342,6 +343,7 @@ async function runUsForecast(isClosing = false) {
     },
   });
   console.log(`[US] Rapor kaydedildi — ID: ${report.id}`);
+  await checkPortfolioAlerts('US', report);
 
   await sendForecastEmail(managerOut, 'US', now);
   console.log(`[US] Tamamlandı — toplam süre: ${Math.round((Date.now() - t0) / 1000)}s`);

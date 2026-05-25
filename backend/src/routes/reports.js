@@ -128,6 +128,49 @@ router.get('/portfolio', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/reports/alerts/count
+router.get('/alerts/count', authMiddleware, async (req, res) => {
+  try {
+    const count = await prisma.portfolioAlert.count({ where: { isRead: false } });
+    res.json({ count });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/reports/alerts
+router.get('/alerts', authMiddleware, async (req, res) => {
+  try {
+    const alerts = await prisma.portfolioAlert.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+    res.json({ alerts });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/reports/alerts/read-all
+router.put('/alerts/read-all', authMiddleware, async (req, res) => {
+  try {
+    await prisma.portfolioAlert.updateMany({ where: { isRead: false }, data: { isRead: true } });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/reports/alerts/:id/read
+router.put('/alerts/:id/read', authMiddleware, async (req, res) => {
+  try {
+    await prisma.portfolioAlert.update({ where: { id: req.params.id }, data: { isRead: true } });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // PUT /api/reports/:id/entry
 router.put('/:id/entry', authMiddleware, async (req, res) => {
   try {

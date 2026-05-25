@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, FileText, Search, Users, Bot, SlidersHorizontal, DollarSign, BarChart2, LogOut, X, Activity } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import Logo from './Logo'
+import api from '../lib/api'
 
 const navItem = (to, Icon, label) => (
   <NavLink
@@ -24,6 +25,21 @@ const navItem = (to, Icon, label) => (
 export default function Sidebar({ isOpen, onClose }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const [alertCount, setAlertCount] = useState(0)
+
+  useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const res = await api.get('/reports/alerts/count')
+        setAlertCount(res.data.count || 0)
+      } catch {
+        // non-blocking
+      }
+    }
+    fetchCount()
+    const id = setInterval(fetchCount, 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   const handleLogout = () => { logout(); navigate('/login') }
 
@@ -48,7 +64,32 @@ export default function Sidebar({ isOpen, onClose }) {
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {navItem('/dashboard', LayoutDashboard, 'Dashboard')}
-        {navItem('/portfolio', BarChart2, 'Genel Tablo')}
+        <NavLink
+          to="/portfolio"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              isActive
+                ? 'bg-teal-600/20 text-teal-400 border border-teal-500/30'
+                : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
+            }`
+          }
+        >
+          <BarChart2 size={18} />
+          Genel Tablo
+          {alertCount > 0 && (
+            <span style={{
+              background: '#ef4444',
+              color: 'white',
+              fontSize: 10,
+              fontWeight: 600,
+              borderRadius: 9999,
+              padding: '1px 6px',
+              marginLeft: 'auto',
+            }}>
+              {alertCount}
+            </span>
+          )}
+        </NavLink>
         {navItem('/reports', FileText, 'Raporlar')}
         {navItem('/analysis', Search, 'Manuel Analiz')}
 

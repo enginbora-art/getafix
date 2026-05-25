@@ -47,6 +47,20 @@ model Report {
   isClosing      Boolean  @default(false)
   userEntryPrice Float?
   createdAt      DateTime @default(now())
+  alerts         PortfolioAlert[]
+}
+
+model PortfolioAlert {
+  id           String   @id @default(cuid())
+  ticker       String
+  market       Market
+  previousBias String
+  newBias      String
+  summary      String   @db.Text
+  reportId     String
+  report       Report   @relation(fields: [reportId], references: [id])
+  isRead       Boolean  @default(false)
+  createdAt    DateTime @default(now())
 }
 
 enum Market {

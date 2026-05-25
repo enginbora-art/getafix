@@ -4,6 +4,7 @@ const { prefilterBist, getBistFilters } = require('./screener');
 const { sendForecastEmail, sendErrorEmail } = require('../email');
 const prisma = require('../../lib/prisma');
 const { logUsage, calculateCost } = require('../../lib/costTracker');
+const { checkPortfolioAlerts } = require('./alertChecker');
 
 // BIST 100 — bist100.txt ile senkronize (97 hisse)
 const BIST_WATCHLIST = [
@@ -269,6 +270,7 @@ async function runBistForecast(isClosing = false) {
     },
   });
   console.log(`[BIST] Rapor kaydedildi — ID: ${report.id}`);
+  await checkPortfolioAlerts('BIST', report);
 
   await sendForecastEmail(finalReport, 'BIST', now);
   console.log(`[BIST] Tamamlandı — toplam süre: ${Math.round((Date.now() - t0) / 1000)}s`);

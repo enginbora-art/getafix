@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { tr } from 'date-fns/locale'
 import api from '../lib/api'
@@ -29,14 +30,117 @@ function PriceCell({ value, currency }) {
   return <span className="text-slate-200">{value.toFixed(2)} {currency}</span>
 }
 
+function alertRowStyle(alert) {
+  if (!alert) return {};
+  if (alert.newBias === 'AL') {
+    return { background: 'rgba(34,197,94,0.08)', borderLeft: '3px solid #22c55e' };
+  }
+  if (alert.previousBias === 'AL' && (alert.newBias === 'BEKLE' || alert.newBias === 'SAT')) {
+    return { background: 'rgba(245,158,11,0.08)', borderLeft: '3px solid #f59e0b' };
+  }
+  return { background: 'rgba(249,115,22,0.08)', borderLeft: '3px solid #f97316' };
+}
+
+function AlertModal({ alert, onClose, onRead }) {
+  const navigate = useNavigate()
+  if (!alert) return null
+
+  const handleConfirm = async () => {
+    await onRead(alert.id)
+    onClose()
+  }
+
+  const biasColor = {
+    AL:    '#4ade80',
+    SAT:   '#f87171',
+    BEKLE: '#fbbf24',
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 9999, padding: '16px',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 16, padding: 28, maxWidth: 480, width: '100%',
+          position: 'relative',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          style={{ position: 'absolute', top: 14, right: 14, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+        >
+          <X size={18} />
+        </button>
+
+        <p style={{ fontSize: 18, fontWeight: 700, color: 'white', marginBottom: 16 }}>
+          ⚡ {alert.ticker} — Karar Değişikliği
+        </p>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+          <span style={{
+            padding: '4px 12px', borderRadius: 6, fontSize: 13, fontWeight: 700,
+            color: biasColor[alert.previousBias] || '#94a3b8',
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+          }}>{alert.previousBias}</span>
+          <span style={{ color: '#64748b', fontSize: 16 }}>→</span>
+          <span style={{
+            padding: '4px 12px', borderRadius: 6, fontSize: 13, fontWeight: 700,
+            color: biasColor[alert.newBias] || '#94a3b8',
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+          }}>{alert.newBias}</span>
+        </div>
+
+        {alert.summary && (
+          <p style={{ fontSize: 13, color: '#94a3b8', lineHeight: 1.6, marginBottom: 20 }}>
+            {alert.summary}
+          </p>
+        )}
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={() => navigate(`/reports/${alert.reportId}`)}
+            style={{
+              flex: 1, padding: '9px 0', borderRadius: 8, fontSize: 13, fontWeight: 500,
+              background: 'rgba(45,212,191,0.1)', border: '1px solid rgba(45,212,191,0.3)',
+              color: '#2dd4bf', cursor: 'pointer',
+            }}
+          >
+            Tam Raporu Gör
+          </button>
+          <button
+            onClick={handleConfirm}
+            style={{
+              flex: 1, padding: '9px 0', borderRadius: 8, fontSize: 13, fontWeight: 500,
+              background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)',
+              color: '#e2e8f0', cursor: 'pointer',
+            }}
+          >
+            Tamam, Anladım
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Portfolio() {
   const [positions, setPositions] = useState([])
+  const [alerts, setAlerts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [lastUpdated, setLastUpdated] = useState(null)
   const [activeTab, setActiveTab] = useState('BIST')
   const [editingId, setEditingId] = useState(null)
   const [editValue, setEditValue] = useState('')
+  const [selectedAlert, setSelectedAlert] = useState(null)
 
   const fetchData = useCallback(async () => {
     try {
@@ -51,11 +155,30 @@ export default function Portfolio() {
     }
   }, [])
 
+  const fetchAlerts = useCallback(async () => {
+    try {
+      const res = await api.get('/reports/alerts')
+      setAlerts(res.data.alerts || [])
+    } catch {
+      // non-blocking
+    }
+  }, [])
+
   useEffect(() => {
     fetchData()
+    fetchAlerts()
     const id = setInterval(fetchData, 60_000)
     return () => clearInterval(id)
-  }, [fetchData])
+  }, [fetchData, fetchAlerts])
+
+  const markRead = async (alertId) => {
+    try {
+      await api.put(`/reports/alerts/${alertId}/read`)
+      setAlerts((prev) => prev.map((a) => a.id === alertId ? { ...a, isRead: true } : a))
+    } catch {
+      // non-blocking
+    }
+  }
 
   const saveEntry = async (reportId) => {
     const val = parseFloat(editValue)
@@ -71,13 +194,9 @@ export default function Portfolio() {
 
   const filtered = positions.filter((p) => p.market === activeTab)
 
-  const rowBg = (p) => {
-    if (p.currentPrice != null && p.stopLoss != null && p.currentPrice < p.stopLoss) {
-      return 'bg-red-500/8'
-    }
-    if (p.currentPrice != null && p.target1 != null && p.currentPrice >= p.target1) {
-      return 'bg-green-500/8'
-    }
+  const rowBgClass = (p) => {
+    if (p.currentPrice != null && p.stopLoss != null && p.currentPrice < p.stopLoss) return 'bg-red-500/8'
+    if (p.currentPrice != null && p.target1 != null && p.currentPrice >= p.target1) return 'bg-green-500/8'
     return ''
   }
 
@@ -151,16 +270,19 @@ export default function Portfolio() {
                   <th className="text-right px-4 py-3">H2 (Orta)</th>
                   <th className="text-right px-4 py-3">Güncel</th>
                   <th className="text-right px-4 py-3">Getiri %</th>
+                  <th className="text-right px-4 py-3">Bildirim</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((p) => {
                   const currency = p.market === 'BIST' ? 'TL' : '$'
                   const isEditing = editingId === p.reportId
+                  const rowAlert = alerts.find((a) => a.ticker === p.ticker && a.market === p.market && !a.isRead)
                   return (
                     <tr
                       key={p.reportId}
-                      className={`border-b border-white/5 hover:bg-white/5 transition-colors ${rowBg(p)}`}
+                      className={`border-b border-white/5 hover:bg-white/5 transition-colors ${rowAlert ? '' : rowBgClass(p)}`}
+                      style={alertRowStyle(rowAlert)}
                     >
                       <td className="px-4 py-3">
                         <span className="font-bold text-white">{p.ticker}</span>
@@ -230,6 +352,27 @@ export default function Portfolio() {
                       <td className="px-4 py-3 text-right">
                         <ReturnCell value={p.returnPct} />
                       </td>
+                      <td className="px-4 py-3 text-right">
+                        {rowAlert ? (
+                          <button
+                            onClick={() => setSelectedAlert(rowAlert)}
+                            style={{
+                              background: 'rgba(245,158,11,0.15)',
+                              border: '0.5px solid #f59e0b',
+                              color: '#f59e0b',
+                              borderRadius: 6,
+                              padding: '4px 10px',
+                              fontSize: 12,
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            🔔 Değişiklik
+                          </button>
+                        ) : (
+                          <span className="text-slate-700">—</span>
+                        )}
+                      </td>
                     </tr>
                   )
                 })}
@@ -238,6 +381,12 @@ export default function Portfolio() {
           </div>
         </div>
       )}
+
+      <AlertModal
+        alert={selectedAlert}
+        onClose={() => setSelectedAlert(null)}
+        onRead={markRead}
+      />
     </div>
   )
 }
