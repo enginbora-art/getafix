@@ -381,7 +381,10 @@ GÖREV — Aşağıdaki FORMATI BİREBİR kullanarak TÜRKÇE Markdown rapor yaz
 | **Stop-loss** | $XXX |
 | **Hedef 1 (kısa vade, 1-5 gün)** | $XXX |
 | **Hedef 2 (orta vade, 1-4 hafta)** | $XXX |
+| **Yıl Sonu Beklentisi** | $XXX |
 | **Risk seviyesi** | Düşük / Orta / Yüksek |
+
+> Yıl Sonu Beklentisi: Mevcut makro koşullar ve şirket fundamentalleri devam ederse yıl sonunda (31 Aralık 2026) beklenen fiyat seviyesi.
 | **Risk/Getiri** | 1:X.X |
 
 ---
@@ -419,6 +422,7 @@ Raporun TAMAMEN SONUNA şu JSON bloğunu ekle (kullanıcıya gösterilmeyecek):
   "target_short_high": 0.00,
   "target_mid_low": 0.00,
   "target_mid_high": 0.00,
+  "year_end": 0.00,
   "risk_level": "Düşük/Orta/Yüksek",
   "thesis_summary": "Tez özeti."
 }

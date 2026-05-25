@@ -433,12 +433,16 @@ export default function Analysis() {
                 const currency = req.market === 'BIST' ? 'TL' : '$'
                 const isInPortfolio = portfolioOverrides[req.reportId] ?? req.inPortfolio ?? false
 
+                const yearEndMatch = req.result.match(/Yıl Sonu Beklentisi[^|]*\|([^|]+)\|/)
+                const yearEnd = yearEndMatch ? yearEndMatch[1].trim() : null
+
                 const summaryRows = rec
                   ? [
                       ['Giriş', rec.entry_low != null ? `${rec.entry_low}${rec.entry_high ? `–${rec.entry_high}` : ''} ${currency}` : null],
                       ['Stop', rec.stop_loss != null ? `${rec.stop_loss} ${currency}` : null],
                       ['H1', rec.target_short_low != null ? `${rec.target_short_low} ${currency}` : null],
                       ['H2', rec.target_mid_low != null ? `${rec.target_mid_low} ${currency}` : null],
+                      ...(yearEnd ? [['Yıl Sonu', yearEnd]] : []),
                       ['Risk', rec.risk_level || null],
                     ].filter(([, v]) => v != null)
                   : []

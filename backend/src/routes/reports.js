@@ -77,6 +77,11 @@ router.get('/portfolio', authMiddleware, async (req, res) => {
       return m?.[1]?.toUpperCase() || null;
     };
 
+    const parseYearEnd = (content) => {
+      const m = content?.match(/Yıl Sonu Beklentisi[^|]*\|([^|]+)\|/);
+      return m ? m[1].trim() : null;
+    };
+
     const withPrices = await Promise.allSettled(
       unique.map(async (r) => {
         const symbol = r.market === 'BIST' ? `${r.ticker}.IS` : r.ticker;
@@ -110,6 +115,7 @@ router.get('/portfolio', authMiddleware, async (req, res) => {
         market: r.market,
         reportDate: r.createdAt,
         bias: parseBias(r.content),
+        yearEnd: parseYearEnd(r.content),
         entryPrice,
         effectiveEntry,
         userEntryPrice: r.userEntryPrice,

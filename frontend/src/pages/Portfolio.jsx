@@ -277,6 +277,7 @@ export default function Portfolio() {
                   <th className="text-right px-4 py-3">Stop</th>
                   <th className="text-right px-4 py-3">H1 (Kısa)</th>
                   <th className="text-right px-4 py-3">H2 (Orta)</th>
+                  <th className="text-right px-4 py-3">Yıl Sonu</th>
                   <th className="text-right px-4 py-3">Güncel</th>
                   <th className="text-right px-4 py-3">Getiri %</th>
                   <th className="text-right px-4 py-3">Bildirim</th>
@@ -355,6 +356,11 @@ export default function Portfolio() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <PriceCell value={p.target2} currency={currency} />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {p.yearEnd
+                          ? <span style={{ color: '#2dd4bf' }}>{p.yearEnd}</span>
+                          : <span className="text-slate-600">—</span>}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <PriceCell value={p.currentPrice} currency={currency} />
