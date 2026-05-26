@@ -8,10 +8,11 @@ const router = express.Router();
 // GET /api/reports?market=BIST&limit=30
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const { market, limit = 30, page = 1, isClosing } = req.query;
+    const { market, limit = 30, page = 1, isClosing, type } = req.query;
     const where = {};
     if (market) where.market = market;
     if (isClosing !== undefined) where.isClosing = isClosing === 'true';
+    if (type === 'MANUAL' || type === 'SCHEDULED') where.type = type;
 
     const take = Math.min(parseInt(limit), 100);
     const skip = (parseInt(page) - 1) * take;

@@ -77,10 +77,11 @@ function ReportDetail({ id }) {
 function ReportList() {
   const [market, setMarket] = useState('BIST')
   const [page, setPage] = useState(1)
+  const [typeFilter, setTypeFilter] = useState('ALL')
 
   const { data, isLoading } = useQuery({
-    queryKey: ['reports', market, page],
-    queryFn: () => api.get(`/reports?market=${market}&limit=6&page=${page}`).then((r) => r.data),
+    queryKey: ['reports', market, page, typeFilter],
+    queryFn: () => api.get(`/reports?market=${market}&limit=6&page=${page}${typeFilter !== 'ALL' ? `&type=${typeFilter}` : ''}`).then((r) => r.data),
     keepPreviousData: true,
   })
 
@@ -90,7 +91,7 @@ function ReportList() {
     <div className="p-4 md:p-8">
       <h1 className="text-2xl font-bold text-white mb-6">Raporlar</h1>
 
-      <div className="flex gap-2 mb-6">
+      <div className="flex items-center gap-2 mb-6 flex-wrap">
         {['BIST', 'US'].map((m) => (
           <button
             key={m}
@@ -100,6 +101,26 @@ function ReportList() {
             {m}
           </button>
         ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px', paddingLeft: '16px', borderLeft: '1px solid rgba(255,255,255,0.1)' }}>
+          {[
+            { key: 'ALL', label: 'Tümü' },
+            { key: 'SCHEDULED', label: 'Otomatik' },
+            { key: 'MANUAL', label: 'Manuel' },
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => { setTypeFilter(key); setPage(1); }}
+              style={{
+                padding: '5px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer',
+                background: typeFilter === key ? '#1D9E75' : 'transparent',
+                color: typeFilter === key ? 'white' : '#64748b',
+                border: typeFilter === key ? '1px solid #1D9E75' : '1px solid rgba(255,255,255,0.1)',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {isLoading ? (
