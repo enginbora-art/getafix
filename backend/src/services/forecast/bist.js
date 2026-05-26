@@ -274,7 +274,9 @@ async function runBistForecast(isClosing = false, isManual = false) {
   await checkPortfolioAlerts('BIST', report);
   await parseAndSaveKapNotices(r1sent.text, 'BIST', report.id);
 
-  await sendForecastEmail(finalReport, 'BIST', now);
+  if (!isManual) {
+    await sendForecastEmail(finalReport, 'BIST', now);
+  }
   console.log(`[BIST] Tamamlandı — toplam süre: ${Math.round((Date.now() - t0) / 1000)}s`);
   return finalReport;
 }

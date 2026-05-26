@@ -347,7 +347,9 @@ async function runUsForecast(isClosing = false, isManual = false) {
   await checkPortfolioAlerts('US', report);
   await parseAndSaveKapNotices(r1sent.text, 'US', report.id);
 
-  await sendForecastEmail(managerOut, 'US', now);
+  if (!isManual) {
+    await sendForecastEmail(managerOut, 'US', now);
+  }
   console.log(`[US] Tamamlandı — toplam süre: ${Math.round((Date.now() - t0) / 1000)}s`);
   return managerOut;
 }
