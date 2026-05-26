@@ -185,7 +185,7 @@ function buildSentPrompt(codes, dateStr) {
   return `Bugün ${dateStr} tarihi itibariyle aşağıdaki BIST kağıtları için piyasa sentiment ve haber/söylenti araştırması yap:\n\nKAĞITLAR: ${codes.join(', ')}\n\nGörev:\n1. Web araması ile her kağıt için son 7 gün içindeki önemli haberler / KAP açıklamaları\n2. Sosyal medya / forum / yatırımcı kanallarındaki sentiment\n3. Global makro konjonktür etkisi (Fed faiz, dolar/TL, emtia, jeopolitik)\n4. Sektörel rüzgar\n5. Doğrulanmamış spekülasyonu açıkça "söylenti" olarak işaretle\n6. TOP 3 sentiment olarak en pozitif kağıt — gerekçeleriyle\n\nÖnemli: Doğrulanmış haberi söylenti ile karıştırma.\n\nÖNEMLİ: Eğer herhangi bir hisse için son 7 günde önemli KAP bildirimi tespit edersen (ortaklık yapısı değişikliği, büyük sözleşme, yönetim değişikliği, kâr/zarar açıklaması, temettü kararı vs.), raporun SONUNA şu formatta bir blok ekle:\n\n\`\`\`kap\n[\n  {\n    "ticker": "THYAO",\n    "title": "Yönetim Kurulu Üyesi Değişikliği",\n    "summary": "THYAO YK\\'ya yeni üye atandı. Değişiklik şirket operasyonlarını etkilemeyecek.",\n    "impact": "NOTR",\n    "sourceDate": "2026-05-24"\n  }\n]\n\`\`\`\n\nimpact değerleri: "POZITIF" | "NEGATIF" | "NOTR". Önemli olmayan rutin bildirimler için bu bloğu ekleme. Birden fazla hisse için bildirim varsa array\\'e ekle.`;
 }
 
-async function runBistForecast(isClosing = false) {
+async function runBistForecast(isClosing = false, isManual = false) {
   const now = new Date();
   const t0 = Date.now();
   console.log(`[BIST] Forecast başladı — ${now.toISOString()} isClosing=${isClosing}`);
@@ -256,6 +256,7 @@ async function runBistForecast(isClosing = false) {
   const report = await prisma.report.create({
     data: {
       market: 'BIST',
+      type: isManual ? 'MANUAL' : 'SCHEDULED',
       date: now,
       content: finalReport,
       jsonData: rec || undefined,

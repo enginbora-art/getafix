@@ -68,9 +68,10 @@ export default function ReportCard({ report }) {
           <span className={`badge border font-bold ${report.market === 'BIST' ? 'text-teal-400 bg-teal-400/10 border-teal-400/20' : 'text-blue-400 bg-blue-400/10 border-blue-400/20'}`}>
             {report.market}
           </span>
-          {report.isClosing && (
-            <span className="badge border text-amber-400 bg-amber-400/10 border-amber-400/20">Kapanış</span>
-          )}
+          {report.isClosing
+            ? <span style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', fontSize: '10px', padding: '2px 8px', borderRadius: '4px', border: '0.5px solid rgba(251,191,36,0.3)', fontWeight: 500 }}>Kapanış</span>
+            : <span style={{ background: 'rgba(45,212,191,0.1)', color: '#2dd4bf', fontSize: '10px', padding: '2px 8px', borderRadius: '4px', border: '0.5px solid rgba(45,212,191,0.2)', fontWeight: 500 }}>Sabah</span>
+          }
           {report.type === 'MANUAL' && (
             <span style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', fontSize: '10px', padding: '2px 8px', borderRadius: '4px', border: '0.5px solid rgba(99,102,241,0.3)', fontWeight: 500 }}>Manuel</span>
           )}

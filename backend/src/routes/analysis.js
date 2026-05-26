@@ -269,7 +269,7 @@ router.post('/run-system', authMiddleware, async (req, res) => {
     const { runUsForecast } = require('../services/forecast/us');
     const run = market === 'BIST' ? runBistForecast : runUsForecast;
 
-    run(true).then(() => {
+    run(false, true).then(() => {
       const endedAt = new Date();
       const duration = Math.round((endedAt.getTime() - new Date(systemRun.startedAt).getTime()) / 1000);
       return prisma.systemRun.update({

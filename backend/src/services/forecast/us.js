@@ -256,7 +256,7 @@ function buildUsSentPrompt(stockBlock, todayStr) {
   return `Today is ${todayStr}. Find news, catalysts, and sentiment for:\n\n${stockBlock}\n\nFor each stock: IGNITION / NEUTRAL / HEADWIND + specific catalyst. Mark unverified info as RUMOR.\n\nIMPORTANT: If you find significant filings or events for any stock in the last 7 days (SEC filings, earnings announcements, insider buying/selling, major contracts, M&A activity, management changes, dividend declarations, guidance updates), append this block at the END of your report:\n\n\`\`\`kap\n[\n  {\n    "ticker": "AAPL",\n    "title": "Q2 Earnings Beat Expectations",\n    "summary": "Apple reported Q2 EPS of $1.53 vs $1.43 expected. Revenue grew 5% YoY driven by services.",\n    "impact": "POZITIF",\n    "sourceDate": "2026-05-24"\n  }\n]\n\`\`\`\n\nimpact values: "POZITIF" | "NEGATIF" | "NOTR". Only include material events. Skip routine or immaterial filings.`;
 }
 
-async function runUsForecast(isClosing = false) {
+async function runUsForecast(isClosing = false, isManual = false) {
   const now = new Date();
   const todayStr = now.toISOString().split('T')[0];
   const t0 = Date.now();
@@ -329,6 +329,7 @@ async function runUsForecast(isClosing = false) {
   const report = await prisma.report.create({
     data: {
       market: 'US',
+      type: isManual ? 'MANUAL' : 'SCHEDULED',
       date: now,
       content: managerOut,
       jsonData: rec || undefined,
