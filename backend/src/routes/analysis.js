@@ -37,13 +37,23 @@ router.get('/requests', authMiddleware, async (req, res) => {
       return res.json([]);
     }
     const isAdmin = req.user.role === 'ADMIN';
-    const where = isAdmin ? {} : { userId: req.user.id };
-    const requests = await prisma.manualRequest.findMany({
-      where,
-      include: isAdmin ? { user: { select: { id: true, name: true, email: true } } } : undefined,
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    });
+    const manualWhere = isAdmin ? {} : { userId: req.user.id };
+    const systemWhere = isAdmin ? {} : { userId: req.user.id };
+
+    const [requests, systemRuns] = await Promise.all([
+      prisma.manualRequest.findMany({
+        where: manualWhere,
+        include: { user: { select: { id: true, name: true, email: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+      prisma.systemRun.findMany({
+        where: systemWhere,
+        include: { user: { select: { id: true, name: true, email: true } } },
+        orderBy: { startedAt: 'desc' },
+        take: 20,
+      }),
+    ]);
 
     // Backfill reportId for old DONE requests that predate the column
     const doneNoReport = requests.filter((r) => r.status === 'DONE' && !r.reportId && r.ticker);
@@ -78,15 +88,38 @@ router.get('/requests', authMiddleware, async (req, res) => {
       rpts.forEach((r) => { inPortfolioMap[r.id] = r.inPortfolio; });
     }
 
-    const enriched = requests.map((r) => {
+    const enrichedManual = requests.map((r) => {
       const effectiveReportId = r.reportId ?? backfillMap[r.id] ?? null;
       return {
         ...r,
+        type: 'MANUAL',
         reportId: effectiveReportId,
         inPortfolio: effectiveReportId ? (inPortfolioMap[effectiveReportId] ?? false) : false,
       };
     });
-    res.json(enriched);
+
+    const enrichedSystemRuns = systemRuns.map((sr) => ({
+      id: sr.id,
+      type: 'SYSTEM_RUN',
+      market: sr.market,
+      ticker: null,
+      status: sr.status === 'RUNNING' ? 'PROCESSING' : sr.status === 'DONE' ? 'DONE' : 'FAILED',
+      currentStep: sr.status === 'RUNNING' ? 'Sistem analizi çalışıyor...' : null,
+      createdAt: sr.startedAt,
+      completedAt: sr.endedAt,
+      result: null,
+      currentPrice: null,
+      inPortfolio: false,
+      reportId: null,
+      isSystemRun: true,
+      user: sr.user || null,
+    }));
+
+    const merged = [...enrichedManual, ...enrichedSystemRuns]
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 50);
+
+    res.json(merged);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

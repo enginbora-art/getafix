@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, FileText, Search, Users, Bot, SlidersHorizontal, DollarSign, BarChart2, LogOut, X, Activity, BookOpen, Bell } from 'lucide-react'
+import { TrendingUp, FileText, Search, Users, Bot, SlidersHorizontal, DollarSign, BarChart2, LogOut, X, Activity, BookOpen, Bell } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import Logo from './Logo'
 import api from '../lib/api'
@@ -63,7 +63,7 @@ export default function Sidebar({ isOpen, onClose }) {
       </div>
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {navItem('/dashboard', LayoutDashboard, 'Dashboard')}
+        {navItem('/dashboard', TrendingUp, 'Günlük Öneri')}
         <NavLink
           to="/portfolio"
           className={({ isActive }) =>

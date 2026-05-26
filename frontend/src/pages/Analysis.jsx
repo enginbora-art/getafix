@@ -320,11 +320,32 @@ function MarketPanel({ market, label, placeholder, isAdmin, onRequestSent }) {
 
 const HISTORY_PER_PAGE = 5
 
+// ─── Toast ────────────────────────────────────────────────────────
+function Toast({ message, onClose }) {
+  if (!message) return null
+  return (
+    <div style={{
+      position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+      background: 'rgba(22,163,74,0.95)', color: '#fff',
+      borderRadius: 10, padding: '12px 18px', fontSize: 13, fontWeight: 500,
+      boxShadow: '0 4px 24px rgba(0,0,0,0.3)', maxWidth: 380,
+      display: 'flex', alignItems: 'flex-start', gap: 10,
+      border: '1px solid rgba(255,255,255,0.2)',
+    }}>
+      <span style={{ flex: 1, lineHeight: 1.5 }}>{message}</span>
+      <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', opacity: 0.7, fontSize: 16, lineHeight: 1, paddingTop: 1 }}>×</button>
+    </div>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────
 export default function Analysis() {
   const navigate = useNavigate()
   const [portfolioOverrides, setPortfolioOverrides] = useState({})
   const [historyPage, setHistoryPage] = useState(1)
+  const [toast, setToast] = useState(null)
+  const prevSystemStatuses = useRef({})
+  const toastTimer = useRef(null)
   const qc = useQueryClient()
   const { user } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
@@ -339,6 +360,19 @@ export default function Analysis() {
       return hasActive ? 3000 : 10000
     },
   })
+
+  useEffect(() => {
+    requests.filter((r) => r.isSystemRun).forEach((r) => {
+      const prev = prevSystemStatuses.current[r.id]
+      if (prev && prev !== 'DONE' && r.status === 'DONE') {
+        const msg = `✓ ${r.market} sistem analizi tamamlandı! Raporu görüntülemek için Raporlar sayfasına gidin.`
+        setToast(msg)
+        if (toastTimer.current) clearTimeout(toastTimer.current)
+        toastTimer.current = setTimeout(() => setToast(null), 5000)
+      }
+      prevSystemStatuses.current[r.id] = r.status
+    })
+  }, [requests])
 
   const totalHistoryPages = Math.max(1, Math.ceil(requests.length / HISTORY_PER_PAGE))
   const pagedRequests = requests.slice(
@@ -400,6 +434,56 @@ export default function Analysis() {
           const isProcessing = req.status === 'PROCESSING'
           const statusLabel = isProcessing && req.currentStep ? req.currentStep : s.label
           const isDone = req.status === 'DONE' && !!req.result
+
+          // ── System Run card ──────────────────────────────────────
+          if (req.isSystemRun) {
+            const sysLabel = req.market === 'BIST' ? 'Tüm BIST Sistemi' : 'Tüm US Sistemi'
+            const triggeredBy = req.user?.name
+              ? `Manuel tetikleme — ${req.user.name}`
+              : 'Otomatik çalışma'
+            return (
+              <div key={req.id} className="glass p-4" style={{ borderLeft: '3px solid rgba(45,212,191,0.3)' }}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className={`badge border ${req.market === 'BIST' ? 'text-teal-400 bg-teal-400/10 border-teal-400/20' : 'text-blue-400 bg-blue-400/10 border-blue-400/20'}`}>
+                      {req.market}
+                    </span>
+                    <span className="text-white font-bold">🚀 {sysLabel}</span>
+                    <span className={`flex items-center gap-1.5 text-sm ${s.color}`}>
+                      <SIcon size={14} className={isProcessing ? 'animate-spin' : ''} />
+                      {statusLabel}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-xs text-slate-500">
+                      {format(new Date(req.createdAt), 'dd MMM HH:mm', { locale: tr })}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-between flex-wrap gap-2">
+                  <span className="text-xs text-slate-500">{triggeredBy}</span>
+                  {req.status === 'DONE' && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-green-400">✓ Tamamlandı — Raporlar sayfasından görüntüleyebilirsiniz</span>
+                      <button
+                        onClick={() => navigate(`/reports?market=${req.market}`)}
+                        style={{
+                          padding: '4px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                          background: 'rgba(45,212,191,0.1)', border: '1px solid rgba(45,212,191,0.25)',
+                          color: '#2dd4bf',
+                        }}
+                      >
+                        Raporu Gör →
+                      </button>
+                    </div>
+                  )}
+                  {req.status === 'FAILED' && req.result && (
+                    <span className="text-xs text-red-400">{req.result}</span>
+                  )}
+                </div>
+              </div>
+            )
+          }
 
           return (
             <div key={req.id} className="glass p-4">
@@ -532,6 +616,8 @@ export default function Analysis() {
           </button>
         </div>
       )}
+
+      <Toast message={toast} onClose={() => setToast(null)} />
     </div>
   )
 }
