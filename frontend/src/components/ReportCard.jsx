@@ -79,9 +79,14 @@ export default function ReportCard({ report }) {
             <span style={{ background: 'rgba(45,212,191,0.1)', color: '#2dd4bf', fontSize: '10px', padding: '2px 8px', borderRadius: '4px', border: '0.5px solid rgba(45,212,191,0.2)', fontWeight: 500 }}>Otomatik</span>
           )}
         </div>
-        <span className="text-xs text-slate-500">
-          {format(new Date(report.createdAt || report.date), 'dd MMM yyyy', { locale: tr })}
-        </span>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ color: '#94a3b8', fontSize: '12px' }}>
+            {new Date(report.createdAt || report.date).toLocaleString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+          </div>
+          {report.userName && (
+            <div style={{ color: '#475569', fontSize: '11px', marginTop: '2px' }}>{report.userName}</div>
+          )}
+        </div>
       </div>
 
       {report.ticker && (

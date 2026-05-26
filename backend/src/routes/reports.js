@@ -43,7 +43,19 @@ router.get('/', authMiddleware, async (req, res) => {
       prisma.report.count({ where }),
     ]);
 
-    res.json({ reports, total, page: parseInt(page), limit: take, totalPages: Math.ceil(total / take) });
+    // For MANUAL reports, look up the submitting user via ManualRequest
+    const manualReportIds = reports.filter((r) => r.type === 'MANUAL').map((r) => r.id);
+    const userNameMap = {};
+    if (manualReportIds.length > 0) {
+      const reqs = await prisma.manualRequest.findMany({
+        where: { reportId: { in: manualReportIds } },
+        select: { reportId: true, user: { select: { name: true } } },
+      });
+      reqs.forEach((r) => { if (r.reportId) userNameMap[r.reportId] = r.user?.name || null; });
+    }
+
+    const enriched = reports.map((r) => ({ ...r, userName: userNameMap[r.id] || null }));
+    res.json({ reports: enriched, total, page: parseInt(page), limit: take, totalPages: Math.ceil(total / take) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

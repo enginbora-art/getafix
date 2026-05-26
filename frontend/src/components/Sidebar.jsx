@@ -91,8 +91,8 @@ export default function Sidebar({ isOpen, onClose }) {
           )}
         </NavLink>
         {navItem('/kap-notices', Bell, 'KAP Bildirimleri')}
-        {navItem('/reports', FileText, 'Raporlar')}
         {navItem('/analysis', Search, 'Manuel Analiz')}
+        {navItem('/reports', FileText, 'Raporlar')}
 
         {user?.role === 'ADMIN' && (
           <>
