@@ -44,10 +44,10 @@ function Toast({ message, color, onClose }) {
   const bg = color === 'green' ? 'rgba(22,163,74,0.95)' : 'rgba(220,38,38,0.95)'
   return (
     <div style={{
-      position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+      position: 'fixed', bottom: 16, right: 12, zIndex: 9999,
       background: bg, color: '#fff',
-      borderRadius: 10, padding: '12px 18px', fontSize: 13, fontWeight: 500,
-      boxShadow: '0 4px 24px rgba(0,0,0,0.3)', maxWidth: 340,
+      borderRadius: 10, padding: '12px 16px', fontSize: 13, fontWeight: 500,
+      boxShadow: '0 4px 24px rgba(0,0,0,0.3)', maxWidth: 'min(340px, calc(100vw - 24px))',
       display: 'flex', alignItems: 'center', gap: 10,
       border: '1px solid rgba(255,255,255,0.2)',
     }}>
@@ -253,7 +253,7 @@ export default function Portfolio() {
   const currency = marketTab === 'BIST' ? 'TL' : '$'
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-3 sm:p-6 max-w-7xl mx-auto">
       {/* Page header */}
       <div className="flex items-start justify-between mb-6">
         <div>
@@ -262,7 +262,7 @@ export default function Portfolio() {
         </div>
         <div className="flex items-center gap-3">
           {lastUpdated && (
-            <span className="text-xs text-slate-500">Son güncelleme: {format(lastUpdated, 'HH:mm:ss')}</span>
+            <span className="hidden sm:inline text-xs text-slate-500">Son güncelleme: {format(lastUpdated, 'HH:mm:ss')}</span>
           )}
           <button
             onClick={() => { fetchData(); fetchClosed() }}
@@ -284,7 +284,7 @@ export default function Portfolio() {
           <button
             key={key}
             onClick={() => { setPositionTab(key); setOpenPage(1); setClosedPage(1) }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
               positionTab === key
                 ? 'bg-teal-600/20 text-teal-400 border border-teal-500/30'
                 : 'text-slate-400 hover:text-slate-200 border border-transparent hover:border-white/10'
@@ -327,7 +327,7 @@ export default function Portfolio() {
         ) : (
           <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm" style={{ minWidth: 960 }}>
                 <thead>
                   <tr className="text-xs text-slate-300 font-medium border-b border-white/5 bg-white/3">
                     <th className="text-left px-4 py-3">Hisse</th>
@@ -488,15 +488,15 @@ export default function Portfolio() {
           <>
             {/* Stats cards */}
             {closedAll.length > 0 && (
-              <div className="grid grid-cols-3 gap-3 mb-5">
+              <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-5">
                 {[
                   { label: 'Toplam İşlem', value: closedPositions.length },
                   { label: 'Başarı Oranı', value: winRate != null ? `${winRate}%` : '—' },
                   { label: 'Ort. Getiri', value: avgReturn != null ? `${parseFloat(avgReturn) >= 0 ? '+' : ''}${avgReturn}%` : '—', color: avgReturn != null ? (parseFloat(avgReturn) >= 0 ? '#4ade80' : '#f87171') : null },
                 ].map(({ label, value, color }) => (
-                  <div key={label} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '14px 18px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: color || '#e2e8f0' }}>{value}</div>
+                  <div key={label} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, textAlign: 'center' }} className="p-2 sm:p-4">
+                    <div style={{ color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }} className="text-[9px] sm:text-[11px]">{label}</div>
+                    <div style={{ fontWeight: 700, color: color || '#e2e8f0' }} className="text-base sm:text-[22px]">{value}</div>
                   </div>
                 ))}
               </div>
@@ -510,7 +510,7 @@ export default function Portfolio() {
             ) : (
               <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm" style={{ minWidth: 760 }}>
                     <thead>
                       <tr className="text-xs text-slate-300 font-medium border-b border-white/5 bg-white/3">
                         <th className="text-left px-4 py-3">Hisse</th>
