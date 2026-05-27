@@ -89,9 +89,30 @@ function ReachBadge({ reachedH1, reachedH2, exitPrice, stopLoss }) {
   return <span style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', fontSize: 11, padding: '2px 8px', borderRadius: 4, border: '0.5px solid rgba(239,68,68,0.2)', fontWeight: 600 }}>Hedef Yok</span>
 }
 
+function PaginationBar({ page, totalPages, onPrev, onNext }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 14 }}>
+      <button
+        onClick={onPrev}
+        disabled={page <= 1}
+        style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, cursor: page <= 1 ? 'not-allowed' : 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: page <= 1 ? '#334155' : '#94a3b8', opacity: page <= 1 ? 0.5 : 1 }}
+      >← Önceki</button>
+      <span style={{ fontSize: 12, color: '#64748b' }}>{page} / {totalPages}</span>
+      <button
+        onClick={onNext}
+        disabled={page >= totalPages}
+        style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, cursor: page >= totalPages ? 'not-allowed' : 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: page >= totalPages ? '#334155' : '#94a3b8', opacity: page >= totalPages ? 0.5 : 1 }}
+      >Sonraki →</button>
+    </div>
+  )
+}
+
 export default function Portfolio() {
   const [positionTab, setPositionTab] = useState('open')
   const [marketTab, setMarketTab] = useState('BIST')
+  const [openPage, setOpenPage] = useState(1)
+  const [closedPage, setClosedPage] = useState(1)
+  const PER_PAGE = 10
   const [positions, setPositions] = useState([])
   const [closedPositions, setClosedPositions] = useState([])
   const [alerts, setAlerts] = useState([])
@@ -197,8 +218,23 @@ export default function Portfolio() {
     }
   }
 
+  const deleteClosedPosition = async (reportId) => {
+    if (!window.confirm('Bu kaydı silmek istediğinizden emin misiniz?')) return
+    try {
+      await api.delete(`/reports/${reportId}/closed-position`)
+      fetchClosed()
+    } catch {
+      alert('Silme işlemi başarısız.')
+    }
+  }
+
   const openFiltered = positions.filter((p) => p.market === marketTab)
   const closedFiltered = closedPositions.filter((p) => p.market === marketTab)
+
+  const openTotalPages = Math.max(1, Math.ceil(openFiltered.length / PER_PAGE))
+  const closedTotalPages = Math.max(1, Math.ceil(closedFiltered.length / PER_PAGE))
+  const pagedOpen = openFiltered.slice((openPage - 1) * PER_PAGE, openPage * PER_PAGE)
+  const pagedClosed = closedFiltered.slice((closedPage - 1) * PER_PAGE, closedPage * PER_PAGE)
 
   const rowBgClass = (p) => {
     if (p.currentPrice != null && p.stopLoss != null && p.currentPrice < p.stopLoss) return 'bg-red-500/8'
@@ -247,7 +283,7 @@ export default function Portfolio() {
         ].map(({ key, label }) => (
           <button
             key={key}
-            onClick={() => setPositionTab(key)}
+            onClick={() => { setPositionTab(key); setOpenPage(1); setClosedPage(1) }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               positionTab === key
                 ? 'bg-teal-600/20 text-teal-400 border border-teal-500/30'
@@ -264,7 +300,7 @@ export default function Portfolio() {
         {['BIST', 'US'].map((tab) => (
           <button
             key={tab}
-            onClick={() => setMarketTab(tab)}
+            onClick={() => { setMarketTab(tab); setOpenPage(1); setClosedPage(1) }}
             className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
               marketTab === tab
                 ? 'bg-white/10 text-white border border-white/20'
@@ -313,7 +349,7 @@ export default function Portfolio() {
                   </tr>
                 </thead>
                 <tbody>
-                  {openFiltered.map((p) => {
+                  {pagedOpen.map((p) => {
                     const isEditing = editingId === p.reportId
                     const isClosingRow = closingId === p.reportId
                     const rowAlert = alerts.find((a) => a.ticker === p.ticker && a.market === p.market && !a.isRead)
@@ -437,6 +473,11 @@ export default function Portfolio() {
         )
       )}
 
+      {/* Open pagination */}
+      {positionTab === 'open' && openTotalPages > 1 && (
+        <PaginationBar page={openPage} totalPages={openTotalPages} onPrev={() => setOpenPage(p => Math.max(1, p - 1))} onNext={() => setOpenPage(p => Math.min(openTotalPages, p + 1))} />
+      )}
+
       {/* ── CLOSED POSITIONS ───────────────────────────────── */}
       {positionTab === 'closed' && (
         closedLoading ? (
@@ -481,10 +522,11 @@ export default function Portfolio() {
                         <th className="text-right px-4 py-3">Kar/Zarar</th>
                         <th className="text-center px-4 py-3">Ulaşılan</th>
                         <th className="text-right px-4 py-3">Tarih</th>
+                        <th className="px-4 py-3"></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {closedFiltered.map((p) => (
+                      {pagedClosed.map((p) => (
                         <tr key={p.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                           <td className="px-4 py-3"><span className="font-bold text-white">{p.ticker}</span></td>
                           <td className="px-4 py-3"><BiasTag bias={p.bias} /></td>
@@ -499,12 +541,26 @@ export default function Portfolio() {
                           <td className="px-4 py-3 text-right text-xs text-slate-400">
                             {p.exitDate ? format(new Date(p.exitDate), 'd MMM yy', { locale: tr }) : '—'}
                           </td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => deleteClosedPosition(p.id)}
+                              title="Kaydı sil"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', fontSize: 15, padding: '2px 6px', borderRadius: 4 }}
+                              onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444' }}
+                              onMouseLeave={(e) => { e.currentTarget.style.color = '#475569' }}
+                            >🗑</button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               </div>
+            )}
+
+            {/* Closed pagination */}
+            {closedTotalPages > 1 && (
+              <PaginationBar page={closedPage} totalPages={closedTotalPages} onPrev={() => setClosedPage(p => Math.max(1, p - 1))} onNext={() => setClosedPage(p => Math.min(closedTotalPages, p + 1))} />
             )}
           </>
         )

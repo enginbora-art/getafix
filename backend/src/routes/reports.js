@@ -141,7 +141,7 @@ router.get('/portfolio', authMiddleware, async (req, res) => {
       };
     });
 
-    res.json({ positions });
+    res.json({ positions, total: positions.length, totalPages: 1 });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -170,13 +170,13 @@ router.get('/alerts', authMiddleware, async (req, res) => {
   }
 });
 
-// GET /api/reports/closed?market=BIST|US&page=1&limit=20
+// GET /api/reports/closed?market=BIST|US&page=1&limit=10
 router.get('/closed', authMiddleware, async (req, res) => {
   try {
-    const { market, page = 1, limit = 100 } = req.query;
+    const { market, page = 1 } = req.query;
+    const take = Math.min(parseInt(req.query.limit) || 10, 200);
     const where = { isClosed: true };
     if (market && ['BIST', 'US'].includes(market)) where.market = market;
-    const take = Math.min(parseInt(limit), 200);
     const skip = (parseInt(page) - 1) * take;
 
     const parseBiasLocal = (content) => {
@@ -272,6 +272,31 @@ router.put('/alerts/read-all', authMiddleware, async (req, res) => {
 router.put('/alerts/:id/read', authMiddleware, async (req, res) => {
   try {
     await prisma.portfolioAlert.update({ where: { id: req.params.id }, data: { isRead: true } });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/reports/:id/closed-position — kapalı pozisyon kaydını sil
+router.delete('/:id/closed-position', authMiddleware, async (req, res) => {
+  try {
+    const report = await prisma.report.findUnique({ where: { id: req.params.id } });
+    if (!report || !report.isClosed) {
+      return res.status(400).json({ error: 'Kapalı pozisyon bulunamadı.' });
+    }
+    await prisma.report.update({
+      where: { id: req.params.id },
+      data: {
+        isClosed: false,
+        exitPrice: null,
+        exitDate: null,
+        profitLoss: null,
+        profitLossPct: null,
+        reachedH1: false,
+        reachedH2: false,
+      },
+    });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
