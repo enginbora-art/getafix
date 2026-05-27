@@ -127,6 +127,7 @@ export default function Portfolio() {
   const [closeValue, setCloseValue] = useState('')
   const [closeLoading, setCloseLoading] = useState(false)
   const [toast, setToast] = useState(null)
+  const [closedStats, setClosedStats] = useState(null)
   const toastTimer = useRef(null)
 
   const showToast = (msg, color) => {
@@ -151,14 +152,15 @@ export default function Portfolio() {
   const fetchClosed = useCallback(async () => {
     setClosedLoading(true)
     try {
-      const res = await api.get('/reports/closed?limit=100')
+      const res = await api.get(`/reports/closed?limit=100&market=${marketTab}`)
       setClosedPositions(res.data.positions || [])
+      setClosedStats(res.data.stats || null)
     } catch {
       // non-blocking
     } finally {
       setClosedLoading(false)
     }
-  }, [])
+  }, [marketTab])
 
   const fetchAlerts = useCallback(async () => {
     try {
@@ -172,10 +174,13 @@ export default function Portfolio() {
   useEffect(() => {
     fetchData()
     fetchAlerts()
-    fetchClosed()
     const id = setInterval(fetchData, 60_000)
     return () => clearInterval(id)
-  }, [fetchData, fetchAlerts, fetchClosed])
+  }, [fetchData, fetchAlerts])
+
+  useEffect(() => {
+    fetchClosed()
+  }, [fetchClosed])
 
   const markRead = async (alertId) => {
     try {
@@ -242,13 +247,7 @@ export default function Portfolio() {
     return ''
   }
 
-  // Closed stats
-  const closedAll = closedPositions.filter((p) => p.profitLossPct != null)
-  const wins = closedAll.filter((p) => p.profitLossPct > 0).length
-  const winRate = closedAll.length > 0 ? ((wins / closedAll.length) * 100).toFixed(1) : null
-  const avgReturn = closedAll.length > 0
-    ? (closedAll.reduce((s, p) => s + p.profitLossPct, 0) / closedAll.length).toFixed(2)
-    : null
+  const avgReturnNum = closedStats ? parseFloat(closedStats.avgReturn) : 0
 
   const currency = marketTab === 'BIST' ? 'TL' : '$'
 
@@ -487,12 +486,12 @@ export default function Portfolio() {
         ) : (
           <>
             {/* Stats cards */}
-            {closedAll.length > 0 && (
+            {closedStats && closedStats.totalCount > 0 && (
               <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-5">
                 {[
-                  { label: 'Toplam İşlem', value: closedPositions.length },
-                  { label: 'Başarı Oranı', value: winRate != null ? `${winRate}%` : '—' },
-                  { label: 'Ort. Getiri', value: avgReturn != null ? `${parseFloat(avgReturn) >= 0 ? '+' : ''}${avgReturn}%` : '—', color: avgReturn != null ? (parseFloat(avgReturn) >= 0 ? '#4ade80' : '#f87171') : null },
+                  { label: 'Toplam İşlem', value: closedStats.totalCount },
+                  { label: 'Başarı Oranı', value: `${closedStats.successRate}%` },
+                  { label: 'Ort. Getiri', value: `${avgReturnNum >= 0 ? '+' : ''}${closedStats.avgReturn}%`, color: avgReturnNum >= 0 ? '#4ade80' : '#f87171' },
                 ].map(({ label, value, color }) => (
                   <div key={label} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, textAlign: 'center' }} className="p-2 sm:p-4">
                     <div style={{ color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }} className="text-[9px] sm:text-[11px]">{label}</div>

@@ -184,7 +184,7 @@ router.get('/closed', authMiddleware, async (req, res) => {
       return m?.[1]?.toUpperCase() || null;
     };
 
-    const [total, reports] = await Promise.all([
+    const [total, reports, allForStats] = await Promise.all([
       prisma.report.count({ where }),
       prisma.report.findMany({
         where,
@@ -201,6 +201,7 @@ router.get('/closed', authMiddleware, async (req, res) => {
           createdAt: true, content: true,
         },
       }),
+      prisma.report.findMany({ where, select: { profitLossPct: true } }),
     ]);
 
     const enriched = reports.map((r) => {
@@ -229,7 +230,16 @@ router.get('/closed', authMiddleware, async (req, res) => {
       };
     });
 
-    res.json({ total, totalPages: Math.ceil(total / take), positions: enriched });
+    const totalCount = allForStats.length;
+    const successCount = allForStats.filter((r) => (r.profitLossPct ?? 0) > 0).length;
+    const sumReturn = allForStats.reduce((s, r) => s + (r.profitLossPct ?? 0), 0);
+    const stats = {
+      totalCount,
+      successRate: totalCount > 0 ? ((successCount / totalCount) * 100).toFixed(1) : '0.0',
+      avgReturn: totalCount > 0 ? (sumReturn / totalCount).toFixed(2) : '0.00',
+    };
+
+    res.json({ total, totalPages: Math.ceil(total / take), positions: enriched, stats });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
