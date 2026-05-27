@@ -32,11 +32,11 @@ function MarketStatus({ market }) {
 export default function Dashboard() {
   const { data: bistData } = useQuery({
     queryKey: ['reports', 'BIST'],
-    queryFn: () => api.get('/reports?market=BIST&limit=1').then((r) => r.data),
+    queryFn: () => api.get('/reports?market=BIST&limit=1&type=SCHEDULED').then((r) => r.data),
   })
   const { data: usData } = useQuery({
     queryKey: ['reports', 'US'],
-    queryFn: () => api.get('/reports?market=US&limit=1').then((r) => r.data),
+    queryFn: () => api.get('/reports?market=US&limit=1&type=SCHEDULED').then((r) => r.data),
   })
 
   const bistReport = bistData?.reports?.[0]
