@@ -47,6 +47,13 @@ model Report {
   isClosing      Boolean  @default(false)
   inPortfolio    Boolean  @default(false)
   userEntryPrice Float?
+  exitPrice      Float?
+  exitDate       DateTime?
+  isClosed       Boolean  @default(false)
+  profitLoss     Float?
+  profitLossPct  Float?
+  reachedH1      Boolean  @default(false)
+  reachedH2      Boolean  @default(false)
   createdAt      DateTime @default(now())
   alerts         PortfolioAlert[]
   kapNotices     KapNotice[]

@@ -75,7 +75,7 @@ export default function Sidebar({ isOpen, onClose }) {
           }
         >
           <BarChart2 size={18} />
-          Genel Tablo
+          Pozisyonlar
           {alertCount > 0 && (
             <span style={{
               background: '#ef4444',

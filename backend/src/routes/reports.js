@@ -170,6 +170,71 @@ router.get('/alerts', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/reports/closed?market=BIST|US&page=1&limit=20
+router.get('/closed', authMiddleware, async (req, res) => {
+  try {
+    const { market, page = 1, limit = 100 } = req.query;
+    const where = { isClosed: true };
+    if (market && ['BIST', 'US'].includes(market)) where.market = market;
+    const take = Math.min(parseInt(limit), 200);
+    const skip = (parseInt(page) - 1) * take;
+
+    const parseBiasLocal = (content) => {
+      const m = content?.match(/##\s*⚡\s*KARAR:\s*(AL|SAT|BEKLE)/i);
+      return m?.[1]?.toUpperCase() || null;
+    };
+
+    const [total, reports] = await Promise.all([
+      prisma.report.count({ where }),
+      prisma.report.findMany({
+        where,
+        orderBy: { exitDate: 'desc' },
+        skip,
+        take,
+        select: {
+          id: true, ticker: true, market: true, type: true,
+          userEntryPrice: true, entryLow: true, entryHigh: true,
+          exitPrice: true, exitDate: true,
+          profitLoss: true, profitLossPct: true,
+          reachedH1: true, reachedH2: true,
+          targetShort: true, targetMid: true, stopLoss: true,
+          createdAt: true, content: true,
+        },
+      }),
+    ]);
+
+    const enriched = reports.map((r) => {
+      const entryPrice = r.userEntryPrice != null
+        ? r.userEntryPrice
+        : r.entryLow != null && r.entryHigh != null
+          ? (r.entryLow + r.entryHigh) / 2
+          : (r.entryLow ?? r.entryHigh ?? null);
+      return {
+        id: r.id,
+        ticker: r.ticker,
+        market: r.market,
+        type: r.type,
+        entryPrice,
+        exitPrice: r.exitPrice,
+        exitDate: r.exitDate,
+        profitLoss: r.profitLoss,
+        profitLossPct: r.profitLossPct != null ? parseFloat(r.profitLossPct.toFixed(2)) : null,
+        reachedH1: r.reachedH1,
+        reachedH2: r.reachedH2,
+        target1: r.targetShort,
+        target2: r.targetMid,
+        stopLoss: r.stopLoss,
+        createdAt: r.createdAt,
+        bias: parseBiasLocal(r.content),
+      };
+    });
+
+    res.json({ total, totalPages: Math.ceil(total / take), positions: enriched });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/reports/kap-notices?market=BIST|US&page=1&limit=10
 router.get('/kap-notices', authMiddleware, async (req, res) => {
   try {
@@ -208,6 +273,51 @@ router.put('/alerts/:id/read', authMiddleware, async (req, res) => {
   try {
     await prisma.portfolioAlert.update({ where: { id: req.params.id }, data: { isRead: true } });
     res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/reports/:id/close — pozisyonu kapat
+router.post('/:id/close', authMiddleware, async (req, res) => {
+  try {
+    const { exitPrice } = req.body;
+    const val = parseFloat(exitPrice);
+    if (!exitPrice || isNaN(val) || val <= 0) {
+      return res.status(400).json({ error: 'Geçerli bir çıkış fiyatı girin.' });
+    }
+
+    const report = await prisma.report.findUnique({ where: { id: req.params.id } });
+    if (!report) return res.status(404).json({ error: 'Rapor bulunamadı.' });
+    if (!report.inPortfolio) return res.status(400).json({ error: 'Bu rapor portföyde değil.' });
+    if (report.isClosed) return res.status(400).json({ error: 'Bu pozisyon zaten kapatılmış.' });
+
+    const entryPrice = report.userEntryPrice != null
+      ? report.userEntryPrice
+      : report.entryLow != null && report.entryHigh != null
+        ? (report.entryLow + report.entryHigh) / 2
+        : (report.entryLow ?? report.entryHigh ?? null);
+
+    const profitLossPct = entryPrice ? ((val - entryPrice) / entryPrice) * 100 : null;
+    const profitLoss = entryPrice ? val - entryPrice : null;
+    const reachedH1 = report.targetShort ? val >= report.targetShort : false;
+    const reachedH2 = report.targetMid ? val >= report.targetMid : false;
+
+    await prisma.report.update({
+      where: { id: req.params.id },
+      data: {
+        exitPrice: val,
+        exitDate: new Date(),
+        isClosed: true,
+        inPortfolio: false,
+        profitLoss,
+        profitLossPct,
+        reachedH1,
+        reachedH2,
+      },
+    });
+
+    res.json({ ok: true, profitLossPct: profitLossPct != null ? parseFloat(profitLossPct.toFixed(2)) : null });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
