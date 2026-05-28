@@ -6,25 +6,13 @@ import { Clock, Circle } from 'lucide-react'
 import api from '../lib/api'
 import ReportCard from '../components/ReportCard'
 
-function MarketStatus({ market }) {
-  const now = new Date()
-  const hour = now.getUTCHours()
-  const min = now.getUTCMinutes()
-  const day = now.getDay()
-  const isWeekday = day >= 1 && day <= 5
-  const timeVal = hour * 60 + min
-
-  let isOpen = false
-  if (market === 'BIST' && isWeekday) {
-    isOpen = timeVal >= 7 * 60 + 0 && timeVal < 15 * 60 + 0  // 10:00-18:00 TR = 07:00-15:00 UTC
-  } else if (market === 'US' && isWeekday) {
-    isOpen = timeVal >= 13 * 60 + 30 && timeVal < 20 * 60 + 0  // 9:30-16:00 ET = 13:30-20:00 UTC
-  }
-
+function MarketStatus({ status }) {
+  const isOpen = status?.isOpen ?? false
+  const reason = status?.reason ?? null
   return (
     <span className={`flex items-center gap-1.5 text-xs font-medium ${isOpen ? 'text-green-400' : 'text-slate-500'}`}>
       <Circle size={8} fill="currentColor" />
-      {isOpen ? 'Borsa Açık' : 'Borsa Kapalı'}
+      {isOpen ? 'Borsa Açık' : reason ? `Borsa Kapalı — ${reason}` : 'Borsa Kapalı'}
     </span>
   )
 }
@@ -37,6 +25,12 @@ export default function Dashboard() {
   const { data: usData } = useQuery({
     queryKey: ['reports', 'US'],
     queryFn: () => api.get('/reports?market=US&limit=1&type=SCHEDULED').then((r) => r.data),
+  })
+  const { data: marketStatus } = useQuery({
+    queryKey: ['market-status'],
+    queryFn: () => api.get('/health/market-status').then((r) => r.data),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
   })
 
   const bistReport = bistData?.reports?.[0]
@@ -68,7 +62,7 @@ export default function Dashboard() {
                 }}>Manuel Analiz</span>
               )}
             </div>
-            <MarketStatus market="BIST" />
+            <MarketStatus status={marketStatus?.bist} />
           </div>
           {bistReport ? (
             <ReportCard report={bistReport} />
@@ -92,7 +86,7 @@ export default function Dashboard() {
                 }}>Manuel Analiz</span>
               )}
             </div>
-            <MarketStatus market="US" />
+            <MarketStatus status={marketStatus?.us} />
           </div>
           {usReport ? (
             <ReportCard report={usReport} />

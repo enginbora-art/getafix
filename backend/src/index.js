@@ -9,6 +9,7 @@ const reportsRoutes = require('./routes/reports');
 const analysisRoutes = require('./routes/analysis');
 const adminRoutes = require('./routes/admin');
 const { initScheduler } = require('./services/scheduler');
+const { getBistStatus, getNyseStatus } = require('./lib/marketCalendar');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -76,6 +77,11 @@ app.use('/api/admin', adminRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', ts: new Date().toISOString() });
+});
+
+app.get('/api/health/market-status', (req, res) => {
+  const now = new Date();
+  res.json({ bist: getBistStatus(now), us: getNyseStatus(now) });
 });
 
 app.use((err, req, res, _next) => {
