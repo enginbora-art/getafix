@@ -16,9 +16,11 @@ function MarketStatus({ status }) {
         <span style={{ width: 8, height: 8, borderRadius: '50%', background: isOpen ? '#22c55e' : '#475569', display: 'inline-block', flexShrink: 0 }} />
         <span style={{ fontSize: 13, color: isOpen ? '#22c55e' : '#94a3b8', fontWeight: 500 }}>
           {isOpen ? 'Borsa Açık' : 'Borsa Kapalı'}
-          {reason && !session && ` — ${reason}`}
         </span>
       </div>
+      {reason && !session && (
+        <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 2, marginLeft: 14 }}>{reason}</div>
+      )}
       {session === 'premarket' && (
         <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 2, marginLeft: 14 }}>Pre-market</div>
       )}
