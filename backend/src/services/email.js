@@ -191,9 +191,15 @@ async function sendMail({ to, subject, markdownBody }) {
   });
 }
 
+function cleanReport(content) {
+  const idx = content.indexOf('## ⚡ KARAR:');
+  return idx === -1 ? content : content.slice(idx);
+}
+
 async function sendForecastEmail(markdownReport, market, date) {
   const dateStr = new Date(date).toLocaleDateString('tr-TR');
   const subject = `${market} Günlük Öneri — ${dateStr}`;
+  markdownReport = cleanReport(markdownReport);
 
   let users = [];
   try {
