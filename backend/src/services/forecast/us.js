@@ -5,6 +5,7 @@ const { sendForecastEmail } = require('../email');
 const prisma = require('../../lib/prisma');
 const { logUsage, calculateCost } = require('../../lib/costTracker');
 const { checkPortfolioAlerts, parseAndSaveKapNotices } = require('./alertChecker');
+const { getCompanyNews, getNewsSentiment, getInsiderTransactions, getRecommendationTrends } = require('../../lib/finnhub');
 
 // S&P 500 Core + S&P 400 Mid Cap + Russell Liquid — sp500_russell.txt ile senkronize
 const US_WATCHLIST = [
@@ -256,6 +257,75 @@ function buildUsSentPrompt(stockBlock, todayStr) {
   return `Today is ${todayStr}. Find news, catalysts, and sentiment for:\n\n${stockBlock}\n\nFor each stock: IGNITION / NEUTRAL / HEADWIND + specific catalyst. Mark unverified info as RUMOR.\n\nIMPORTANT: If you find significant filings or events for any stock in the last 7 days (SEC filings, earnings announcements, insider buying/selling, major contracts, M&A activity, management changes, dividend declarations, guidance updates), append this block at the END of your report:\n\n\`\`\`kap\n[\n  {\n    "ticker": "AAPL",\n    "title": "Q2 Earnings Beat Expectations",\n    "summary": "Apple reported Q2 EPS of $1.53 vs $1.43 expected. Revenue grew 5% YoY driven by services.",\n    "impact": "POZITIF",\n    "sourceDate": "2026-05-24"\n  }\n]\n\`\`\`\n\nimpact values: "POZITIF" | "NEGATIF" | "NOTR". Only include material events. Skip routine or immaterial filings.`;
 }
 
+async function fetchFinnhubData(tickers) {
+  if (!process.env.FINNHUB_API_KEY) return {};
+  const results = {};
+  for (const ticker of tickers) {
+    try {
+      const [news, sentiment, insider, recommendations] = await Promise.all([
+        getCompanyNews(ticker),
+        getNewsSentiment(ticker),
+        getInsiderTransactions(ticker),
+        getRecommendationTrends(ticker),
+      ]);
+      results[ticker] = { news, sentiment, insider, recommendations };
+      await new Promise((r) => setTimeout(r, 200));
+    } catch (err) {
+      console.error(`[Finnhub] ${ticker} hatası:`, err.message);
+      results[ticker] = null;
+    }
+  }
+  return results;
+}
+
+function buildUsSentPromptWithFinnhub(stockBlock, todayStr, finnhubData) {
+  let section = '\n\n## FINNHUB STRUCTURED DATA\n';
+  for (const [ticker, data] of Object.entries(finnhubData)) {
+    if (!data) continue;
+    section += `\n### ${ticker}\n`;
+    if (data.sentiment?.bullishPercent != null) {
+      section += `Sentiment: Bullish ${(data.sentiment.bullishPercent * 100).toFixed(0)}% / Bearish ${(data.sentiment.bearishPercent * 100).toFixed(0)}%\n`;
+      if (data.sentiment.buzz != null) section += `Buzz score: ${data.sentiment.buzz.toFixed(2)}\n`;
+    }
+    if (data.news?.length > 0) {
+      section += `Recent news (${data.news.length}):\n`;
+      data.news.slice(0, 5).forEach((n) => { section += `- [${n.source}] ${n.headline}\n`; });
+    }
+    if (data.insider?.length > 0) {
+      const buys = data.insider.filter((t) => t.transactionCode === 'P');
+      const sells = data.insider.filter((t) => t.transactionCode === 'S');
+      if (buys.length > 0) section += `Insider buying: ${buys.length} transactions\n`;
+      if (sells.length > 0) section += `Insider selling: ${sells.length} transactions\n`;
+    }
+    if (data.recommendations?.length > 0) {
+      const r = data.recommendations[0];
+      section += `Analyst consensus: Buy=${r.buy} Hold=${r.hold} Sell=${r.sell}\n`;
+    }
+  }
+  return buildUsSentPrompt(stockBlock, todayStr) + section;
+}
+
+async function importFinnhubKapNotices(finnhubData, reportId) {
+  for (const [ticker, data] of Object.entries(finnhubData)) {
+    if (!data?.news) continue;
+    const important = data.news.filter((n) =>
+      /earnings|upgrade|downgrade|insider|acquire|merger|fda|approval/i.test(n.headline),
+    );
+    for (const news of important.slice(0, 2)) {
+      try {
+        const existing = await prisma.kapNotice.findFirst({ where: { ticker, market: 'US', title: news.headline } });
+        if (!existing) {
+          await prisma.kapNotice.create({
+            data: { ticker, market: 'US', title: news.headline, summary: news.summary || news.headline, impact: 'NOTR', sourceDate: new Date(news.datetime), reportId },
+          });
+        }
+      } catch (err) {
+        console.error(`[Finnhub] KAP kayıt hatası ${ticker}:`, err.message);
+      }
+    }
+  }
+}
+
 async function runUsForecast(isClosing = false, isManual = false) {
   const now = new Date();
   const todayStr = now.toISOString().split('T')[0];
@@ -297,8 +367,15 @@ async function runUsForecast(isClosing = false, isManual = false) {
   console.log(`[US] Ajan 2 (temel) tamamlandı (${r1fund.inputTokens} in / ${r1fund.outputTokens} out token)`);
   await logUsage({ requestType: 'scheduled', market: 'US', agentName: 'fundamental', inputTokens: r1fund.inputTokens, outputTokens: r1fund.outputTokens });
 
+  console.log('[US] Finnhub verisi çekiliyor...');
+  const finnhubData = await fetchFinnhubData(candidates);
+  console.log(`[US] Finnhub verisi tamamlandı (${Object.keys(finnhubData).length} hisse)`);
+
   console.log('[US] Ajan 3 (sentiment/web) başlıyor...');
-  const r1sent = await callAgentWithWebSearch('US', 'sentiment', buildUsSentPrompt(stockBlock, todayStr));
+  const sentPrompt = Object.keys(finnhubData).length > 0
+    ? buildUsSentPromptWithFinnhub(stockBlock, todayStr, finnhubData)
+    : buildUsSentPrompt(stockBlock, todayStr);
+  const r1sent = await callAgentWithWebSearch('US', 'sentiment', sentPrompt);
   console.log(`[US] Ajan 3 (sentiment/web) tamamlandı (${r1sent.inputTokens} in / ${r1sent.outputTokens} out token)`);
   await logUsage({ requestType: 'scheduled', market: 'US', agentName: 'sentiment', inputTokens: r1sent.inputTokens, outputTokens: r1sent.outputTokens });
 
@@ -346,6 +423,7 @@ async function runUsForecast(isClosing = false, isManual = false) {
   console.log(`[US] Rapor kaydedildi — ID: ${report.id}`);
   await checkPortfolioAlerts('US', report);
   await parseAndSaveKapNotices(r1sent.text, 'US', report.id);
+  if (Object.keys(finnhubData).length > 0) await importFinnhubKapNotices(finnhubData, report.id);
 
   if (!isManual) {
     await sendForecastEmail(managerOut, 'US', now);
@@ -457,7 +535,11 @@ async function runManualAnalysis(ticker, onStep = null, context = {}) {
   await logUsage({ userId, requestType: 'manual', market: 'US', agentName: 'fundamental', inputTokens: r1fund.inputTokens, outputTokens: r1fund.outputTokens, ticker });
 
   await onStep?.('Ajan 3 — Haberler ve piyasa duygusu taranıyor...');
-  const r1sent = await callAgentWithWebSearch('US', 'sentiment', buildUsSentPrompt(stockBlock, todayStr));
+  const finnhubDataManual = await fetchFinnhubData([ticker]);
+  const sentPromptManual = finnhubDataManual[ticker]
+    ? buildUsSentPromptWithFinnhub(stockBlock, todayStr, finnhubDataManual)
+    : buildUsSentPrompt(stockBlock, todayStr);
+  const r1sent = await callAgentWithWebSearch('US', 'sentiment', sentPromptManual);
   totalInputTokens += r1sent.inputTokens; totalOutputTokens += r1sent.outputTokens;
   await logUsage({ userId, requestType: 'manual', market: 'US', agentName: 'sentiment', inputTokens: r1sent.inputTokens, outputTokens: r1sent.outputTokens, ticker });
 
@@ -520,6 +602,7 @@ async function runManualAnalysis(ticker, onStep = null, context = {}) {
       },
     });
     reportId = savedReport.id;
+    if (finnhubDataManual[ticker]) await importFinnhubKapNotices(finnhubDataManual, savedReport.id);
   } catch (err) {
     console.error('[US] Manuel rapor yazılamadı:', err.message);
   }
