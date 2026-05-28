@@ -2,18 +2,30 @@ import React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { tr } from 'date-fns/locale'
-import { Clock, Circle } from 'lucide-react'
+import { Clock } from 'lucide-react'
 import api from '../lib/api'
 import ReportCard from '../components/ReportCard'
 
 function MarketStatus({ status }) {
   const isOpen = status?.isOpen ?? false
   const reason = status?.reason ?? null
+  const session = status?.session ?? null
   return (
-    <span className={`flex items-center gap-1.5 text-xs font-medium ${isOpen ? 'text-green-400' : 'text-slate-500'}`}>
-      <Circle size={8} fill="currentColor" />
-      {isOpen ? 'Borsa Açık' : reason ? `Borsa Kapalı — ${reason}` : 'Borsa Kapalı'}
-    </span>
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: isOpen ? '#22c55e' : '#475569', display: 'inline-block', flexShrink: 0 }} />
+        <span style={{ fontSize: 13, color: isOpen ? '#22c55e' : '#94a3b8', fontWeight: 500 }}>
+          {isOpen ? 'Borsa Açık' : 'Borsa Kapalı'}
+          {reason && !session && ` — ${reason}`}
+        </span>
+      </div>
+      {session === 'premarket' && (
+        <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 2, marginLeft: 14 }}>Pre-market</div>
+      )}
+      {session === 'afterhours' && (
+        <div style={{ fontSize: 11, color: '#a78bfa', marginTop: 2, marginLeft: 14 }}>After-hours</div>
+      )}
+    </div>
   )
 }
 

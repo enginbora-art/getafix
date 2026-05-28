@@ -55,14 +55,33 @@ function getBistStatus(date = new Date()) {
 }
 
 function getNyseStatus(date = new Date()) {
-  const day = date.getDay();
-  if (day === 0 || day === 6) return { isOpen: false, reason: null };
-  const dateStr = date.toISOString().split('T')[0];
-  const holiday = NYSE_HOLIDAYS_2026[dateStr];
-  if (holiday) return { isOpen: false, reason: holiday };
-  // NYSE: 9:30–16:00 ET = 13:30–20:00 UTC
-  const t = date.getUTCHours() * 60 + date.getUTCMinutes();
-  return { isOpen: t >= 810 && t < 1200, reason: null };
+  if (!isNyseOpen(date)) {
+    const dateStr = date.toISOString().split('T')[0];
+    const holiday = NYSE_HOLIDAYS_2026[dateStr];
+    return { isOpen: false, session: null, reason: holiday || 'Hafta sonu' };
+  }
+
+  // TR time (UTC+3) as proxy for EDT-era times; covers Apr–Oct accurately
+  const trHour = date.getUTCHours() + 3;
+  const trTime = trHour * 60 + date.getUTCMinutes();
+
+  const PRE_START = 11 * 60;       // 11:00 TR — 04:00 EDT
+  const MKT_START = 16 * 60 + 30; // 16:30 TR — 09:30 EDT
+  const MKT_END   = 23 * 60;      // 23:00 TR — 16:00 EDT
+
+  // After-hours 23:00–03:00 TR; trHour can exceed 24 for same-day values
+  const isAfterHours = trTime >= MKT_END || (trHour % 24 >= 0 && trHour % 24 < 3);
+
+  if (trTime >= MKT_START && trTime < MKT_END) {
+    return { isOpen: true, session: 'market', reason: null };
+  }
+  if (trTime >= PRE_START && trTime < MKT_START) {
+    return { isOpen: false, session: 'premarket', reason: 'Pre-market' };
+  }
+  if (isAfterHours) {
+    return { isOpen: false, session: 'afterhours', reason: 'After-hours' };
+  }
+  return { isOpen: false, session: null, reason: null };
 }
 
 module.exports = { isBistOpen, isNyseOpen, getBistStatus, getNyseStatus };
