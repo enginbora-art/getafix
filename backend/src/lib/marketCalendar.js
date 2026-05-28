@@ -44,14 +44,15 @@ function isNyseOpen(date = new Date()) {
 
 // Full status: trading day + hours check + holiday reason
 function getBistStatus(date = new Date()) {
-  const day = date.getDay();
-  if (day === 0 || day === 6) return { isOpen: false, reason: null };
-  const dateStr = date.toISOString().split('T')[0];
-  const holiday = BIST_HOLIDAYS_2026[dateStr];
-  if (holiday) return { isOpen: false, reason: holiday };
+  if (!isBistOpen(date)) {
+    const dateStr = date.toISOString().split('T')[0];
+    const holiday = BIST_HOLIDAYS_2026[dateStr];
+    return { isOpen: false, session: null, reason: holiday || 'Hafta sonu' };
+  }
   // BIST: 10:00–18:00 Istanbul = 07:00–15:00 UTC
   const t = date.getUTCHours() * 60 + date.getUTCMinutes();
-  return { isOpen: t >= 420 && t < 900, reason: null };
+  if (t >= 420 && t < 900) return { isOpen: true, session: 'market', reason: null };
+  return { isOpen: false, session: null, reason: null };
 }
 
 function getNyseStatus(date = new Date()) {
