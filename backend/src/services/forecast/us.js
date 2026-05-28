@@ -5,7 +5,7 @@ const { sendForecastEmail } = require('../email');
 const prisma = require('../../lib/prisma');
 const { logUsage, calculateCost } = require('../../lib/costTracker');
 const { checkPortfolioAlerts, parseAndSaveKapNotices } = require('./alertChecker');
-const { getCompanyNews, getNewsSentiment, getInsiderTransactions, getRecommendationTrends } = require('../../lib/finnhub');
+const { getCompanyNews, getInsiderTransactions, getRecommendationTrends } = require('../../lib/finnhub');
 
 // S&P 500 Core + S&P 400 Mid Cap + Russell Liquid — sp500_russell.txt ile senkronize
 const US_WATCHLIST = [
@@ -262,13 +262,12 @@ async function fetchFinnhubData(tickers) {
   const results = {};
   for (const ticker of tickers) {
     try {
-      const [news, sentiment, insider, recommendations] = await Promise.all([
+      const [news, insider, recommendations] = await Promise.all([
         getCompanyNews(ticker),
-        getNewsSentiment(ticker),
         getInsiderTransactions(ticker),
         getRecommendationTrends(ticker),
       ]);
-      results[ticker] = { news, sentiment, insider, recommendations };
+      results[ticker] = { news, insider, recommendations };
       await new Promise((r) => setTimeout(r, 200));
     } catch (err) {
       console.error(`[Finnhub] ${ticker} hatası:`, err.message);
@@ -283,10 +282,6 @@ function buildUsSentPromptWithFinnhub(stockBlock, todayStr, finnhubData) {
   for (const [ticker, data] of Object.entries(finnhubData)) {
     if (!data) continue;
     section += `\n### ${ticker}\n`;
-    if (data.sentiment?.bullishPercent != null) {
-      section += `Sentiment: Bullish ${(data.sentiment.bullishPercent * 100).toFixed(0)}% / Bearish ${(data.sentiment.bearishPercent * 100).toFixed(0)}%\n`;
-      if (data.sentiment.buzz != null) section += `Buzz score: ${data.sentiment.buzz.toFixed(2)}\n`;
-    }
     if (data.news?.length > 0) {
       section += `Recent news (${data.news.length}):\n`;
       data.news.slice(0, 5).forEach((n) => { section += `- [${n.source}] ${n.headline}\n`; });

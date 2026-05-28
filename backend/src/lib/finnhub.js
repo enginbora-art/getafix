@@ -23,21 +23,8 @@ async function getCompanyNews(symbol) {
   }
 }
 
-async function getNewsSentiment(symbol) {
-  try {
-    const { data } = await axios.get(`${BASE}/news-sentiment`, { params: { symbol, token: token() } });
-    if (!data || !data.sentiment) return null;
-    return {
-      bullishPercent: data.sentiment.bullishPercent,
-      bearishPercent: data.sentiment.bearishPercent,
-      score: data.companyNewsScore,
-      buzz: data.buzz?.buzz,
-      weeklyAverage: data.buzz?.weeklyAverage,
-    };
-  } catch (err) {
-    console.error(`[Finnhub] Sentiment hatası ${symbol}:`, err.message);
-    return null;
-  }
+async function getNewsSentiment(_symbol) {
+  return null; // Premium endpoint, free plan'da yok
 }
 
 async function getInsiderTransactions(symbol) {
