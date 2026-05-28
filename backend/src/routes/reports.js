@@ -248,6 +248,25 @@ router.get('/closed', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/reports/market-news?ticker=AAPL
+router.get('/market-news', authMiddleware, async (req, res) => {
+  if (!process.env.FINNHUB_API_KEY) {
+    return res.json({ hasApiKey: false });
+  }
+  const { ticker } = req.query;
+  if (!ticker) return res.json({ hasApiKey: true, news: [], sentiment: null });
+  try {
+    const { getCompanyNews, getNewsSentiment } = require('../lib/finnhub');
+    const [news, sentiment] = await Promise.all([
+      getCompanyNews(ticker.toUpperCase()),
+      getNewsSentiment(ticker.toUpperCase()),
+    ]);
+    res.json({ hasApiKey: true, news, sentiment });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/reports/kap-notices?market=BIST|US&page=1&limit=10
 router.get('/kap-notices', authMiddleware, async (req, res) => {
   try {

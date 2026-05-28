@@ -17,7 +17,7 @@ import AdminCriteria from './pages/admin/Criteria'
 import AdminCosts from './pages/admin/Costs'
 import AdminAnalyses from './pages/admin/Analyses'
 import SystemDocs from './pages/admin/SystemDocs'
-import KapNotices from './pages/KapNotices'
+import News from './pages/News'
 
 export default function App() {
   return (
@@ -35,7 +35,8 @@ export default function App() {
             <Route path="/reports" element={<Reports />} />
             <Route path="/reports/:id" element={<Reports />} />
             <Route path="/analysis" element={<Analysis />} />
-            <Route path="/kap-notices" element={<KapNotices />} />
+            <Route path="/news" element={<News />} />
+            <Route path="/kap-notices" element={<Navigate to="/news" replace />} />
             <Route path="/admin/users" element={<ProtectedRoute adminOnly><AdminUsers /></ProtectedRoute>} />
             <Route path="/admin/agents" element={<ProtectedRoute adminOnly><AdminAgents /></ProtectedRoute>} />
             <Route path="/admin/criteria" element={<ProtectedRoute adminOnly><AdminCriteria /></ProtectedRoute>} />

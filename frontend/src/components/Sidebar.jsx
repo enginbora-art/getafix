@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { TrendingUp, FileText, Search, Users, Bot, SlidersHorizontal, DollarSign, BarChart2, LogOut, X, Activity, BookOpen, Bell } from 'lucide-react'
+import { TrendingUp, FileText, Search, Users, Bot, SlidersHorizontal, DollarSign, BarChart2, LogOut, X, Activity, BookOpen, Newspaper } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import Logo from './Logo'
 import api from '../lib/api'
@@ -90,7 +90,7 @@ export default function Sidebar({ isOpen, onClose }) {
             </span>
           )}
         </NavLink>
-        {navItem('/kap-notices', Bell, 'KAP Bildirimleri')}
+        {navItem('/news', Newspaper, 'Haberler')}
         {navItem('/analysis', Search, 'Manuel Analiz')}
         {navItem('/reports', FileText, 'Raporlar')}
 
