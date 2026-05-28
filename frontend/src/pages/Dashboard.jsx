@@ -27,6 +27,9 @@ function MarketStatus({ status }) {
       {session === 'afterhours' && (
         <div style={{ fontSize: 11, color: '#a78bfa', marginTop: 2, marginLeft: 14 }}>After-hours</div>
       )}
+      {session === 'night' && (
+        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2, marginLeft: 14 }}>Gece piyasası</div>
+      )}
     </div>
   )
 }

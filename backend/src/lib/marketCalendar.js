@@ -71,7 +71,9 @@ function getNyseStatus(date = new Date()) {
   const MKT_END   = 23 * 60;      // 23:00 TR — 16:00 EDT
 
   // After-hours 23:00–03:00 TR; trHour can exceed 24 for same-day values
-  const isAfterHours = trTime >= MKT_END || (trHour % 24 >= 0 && trHour % 24 < 3);
+  const trHour24 = trHour % 24;
+  const isAfterHours = trTime >= MKT_END || (trHour24 >= 0 && trHour24 < 3);
+  const isNight = trHour24 >= 3 && trHour24 < 11;
 
   if (trTime >= MKT_START && trTime < MKT_END) {
     return { isOpen: true, session: 'market', reason: null };
@@ -81,6 +83,9 @@ function getNyseStatus(date = new Date()) {
   }
   if (isAfterHours) {
     return { isOpen: false, session: 'afterhours', reason: 'After-hours' };
+  }
+  if (isNight) {
+    return { isOpen: false, session: 'night', reason: null };
   }
   return { isOpen: false, session: null, reason: null };
 }
