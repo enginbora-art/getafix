@@ -395,7 +395,13 @@ export default function Portfolio() {
                           <td className="px-4 py-3 text-right">
                             {p.yearEnd ? <span style={{ color: '#2dd4bf' }}>{p.yearEnd}</span> : <span className="text-slate-600">—</span>}
                           </td>
-                          <td className="px-4 py-3 text-right"><PriceCell value={p.currentPrice} currency={currency} /></td>
+                          <td className="px-4 py-3 text-right">
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                              <PriceCell value={p.currentPrice} currency={currency} />
+                              {p.priceType === 'after-hours' && <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 600 }}>(AH)</span>}
+                              {p.priceType === 'pre-market' && <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 600 }}>(PM)</span>}
+                            </div>
+                          </td>
                           <td className="px-4 py-3 text-right"><ReturnCell value={p.returnPct} /></td>
                           <td className="px-4 py-3 text-right">
                             {rowAlert ? (

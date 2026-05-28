@@ -99,10 +99,12 @@ router.get('/portfolio', authMiddleware, async (req, res) => {
       unique.map(async (r) => {
         const symbol = r.market === 'BIST' ? `${r.ticker}.IS` : r.ticker;
         try {
-          const quote = await yf.quote(symbol, { fields: ['regularMarketPrice'] });
-          return { ...r, currentPrice: quote.regularMarketPrice ?? null };
+          const quote = await yf.quote(symbol, { fields: ['regularMarketPrice', 'preMarketPrice', 'postMarketPrice'] });
+          const currentPrice = quote.postMarketPrice || quote.preMarketPrice || quote.regularMarketPrice || null;
+          const priceType = quote.postMarketPrice ? 'after-hours' : quote.preMarketPrice ? 'pre-market' : 'regular';
+          return { ...r, currentPrice, priceType };
         } catch {
-          return { ...r, currentPrice: null };
+          return { ...r, currentPrice: null, priceType: 'regular' };
         }
       }),
     );
@@ -137,6 +139,7 @@ router.get('/portfolio', authMiddleware, async (req, res) => {
         stopLoss: r.stopLoss,
         riskLevel: r.riskLevel,
         currentPrice: r.currentPrice ?? null,
+        priceType: r.priceType || 'regular',
         returnPct,
       };
     });
