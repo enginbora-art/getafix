@@ -1,16 +1,7 @@
-const finnhub = require('finnhub');
+const axios = require('axios');
 
-// DefaultApi constructor accepts the API key directly
-const client = new finnhub.DefaultApi(process.env.FINNHUB_API_KEY || '');
-
-function promisify(fn, ...args) {
-  return new Promise((resolve, reject) => {
-    fn(...args, (error, data) => {
-      if (error) reject(error);
-      else resolve(data);
-    });
-  });
-}
+const BASE = 'https://finnhub.io/api/v1';
+const token = () => process.env.FINNHUB_API_KEY;
 
 async function getCompanyNews(symbol) {
   try {
@@ -18,8 +9,8 @@ async function getCompanyNews(symbol) {
     const week = new Date(today - 7 * 24 * 60 * 60 * 1000);
     const from = week.toISOString().split('T')[0];
     const to = today.toISOString().split('T')[0];
-    const news = await promisify(client.companyNews.bind(client), symbol, from, to);
-    return (news || []).slice(0, 10).map((n) => ({
+    const { data } = await axios.get(`${BASE}/company-news`, { params: { symbol, from, to, token: token() } });
+    return (data || []).slice(0, 10).map((n) => ({
       headline: n.headline,
       summary: n.summary?.slice(0, 200),
       source: n.source,
@@ -34,13 +25,14 @@ async function getCompanyNews(symbol) {
 
 async function getNewsSentiment(symbol) {
   try {
-    const data = await promisify(client.newsSentiment.bind(client), symbol);
+    const { data } = await axios.get(`${BASE}/news-sentiment`, { params: { symbol, token: token() } });
+    if (!data || !data.sentiment) return null;
     return {
-      bullishPercent: data?.sentiment?.bullishPercent,
-      bearishPercent: data?.sentiment?.bearishPercent,
-      score: data?.companyNewsScore,
-      buzz: data?.buzz?.buzz,
-      weeklyAverage: data?.buzz?.weeklyAverage,
+      bullishPercent: data.sentiment.bullishPercent,
+      bearishPercent: data.sentiment.bearishPercent,
+      score: data.companyNewsScore,
+      buzz: data.buzz?.buzz,
+      weeklyAverage: data.buzz?.weeklyAverage,
     };
   } catch (err) {
     console.error(`[Finnhub] Sentiment hatası ${symbol}:`, err.message);
@@ -50,7 +42,7 @@ async function getNewsSentiment(symbol) {
 
 async function getInsiderTransactions(symbol) {
   try {
-    const data = await promisify(client.insiderTransactions.bind(client), symbol, '', '');
+    const { data } = await axios.get(`${BASE}/stock/insider-transactions`, { params: { symbol, token: token() } });
     return (data?.data || []).slice(0, 5).map((t) => ({
       name: t.name,
       share: t.share,
@@ -66,7 +58,7 @@ async function getInsiderTransactions(symbol) {
 
 async function getRecommendationTrends(symbol) {
   try {
-    const data = await promisify(client.recommendationTrends.bind(client), symbol);
+    const { data } = await axios.get(`${BASE}/stock/recommendation`, { params: { symbol, token: token() } });
     return (data || []).slice(0, 2);
   } catch (err) {
     console.error(`[Finnhub] Öneri hatası ${symbol}:`, err.message);
