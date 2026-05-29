@@ -38,6 +38,7 @@ router.get('/', authMiddleware, async (req, res) => {
           isClosing: true,
           inPortfolio: true,
           createdAt: true,
+          jsonData: true,
         },
       }),
       prisma.report.count({ where }),

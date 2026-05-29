@@ -514,6 +514,7 @@ export default function Analysis() {
                 const rec = parseResultJson(req.result)
                 const biasMatch = req.result.match(/##\s*⚡\s*KARAR:\s*(AL|SAT|BEKLE)/i)
                 const bias = biasMatch?.[1]?.toUpperCase()
+                const insiderSignal = req.market === 'US' ? (rec?.insider_signal || null) : null
                 const currency = req.market === 'BIST' ? 'TL' : '$'
                 const isInPortfolio = portfolioOverrides[req.reportId] ?? req.inPortfolio ?? false
 
@@ -543,6 +544,16 @@ export default function Analysis() {
                         {bias && (
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-sm font-bold border ${BIAS_STYLE[bias] || 'text-slate-400 border-white/10'}`}>
                             ⚡ {bias}
+                          </span>
+                        )}
+                        {insiderSignal === 'BULLISH' && (
+                          <span style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', fontSize: '10px', padding: '2px 8px', borderRadius: '4px', border: '0.5px solid rgba(34,197,94,0.2)', fontWeight: 500 }}>
+                            👤 Insider Alım
+                          </span>
+                        )}
+                        {insiderSignal === 'BEARISH' && (
+                          <span style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontSize: '10px', padding: '2px 8px', borderRadius: '4px', border: '0.5px solid rgba(239,68,68,0.2)', fontWeight: 500 }}>
+                            👤 Insider Satım
                           </span>
                         )}
                         {req.currentPrice != null && (

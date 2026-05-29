@@ -21,6 +21,7 @@ export default function ReportCard({ report }) {
   const [toggling, setToggling] = useState(false)
   const risk = RISK_CONFIG[report.riskLevel] || RISK_CONFIG['Orta']
   const RiskIcon = risk.Icon
+  const insiderSignal = report.market === 'US' ? (report.jsonData?.insider_signal || null) : null
 
   const handlePdf = async (e) => {
     e.stopPropagation()
@@ -120,9 +121,23 @@ export default function ReportCard({ report }) {
         </div>
       )}
 
-      {report.riskLevel && (
-        <div className={`badge border self-start gap-1 ${risk.color}`}>
-          <RiskIcon size={11} /> {risk.label}
+      {(report.riskLevel || insiderSignal) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          {report.riskLevel && (
+            <div className={`badge border gap-1 ${risk.color}`}>
+              <RiskIcon size={11} /> {risk.label}
+            </div>
+          )}
+          {insiderSignal === 'BULLISH' && (
+            <span style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', fontSize: '10px', padding: '2px 8px', borderRadius: '4px', border: '0.5px solid rgba(34,197,94,0.2)', fontWeight: 500 }}>
+              👤 Insider Alım
+            </span>
+          )}
+          {insiderSignal === 'BEARISH' && (
+            <span style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontSize: '10px', padding: '2px 8px', borderRadius: '4px', border: '0.5px solid rgba(239,68,68,0.2)', fontWeight: 500 }}>
+              👤 Insider Satım
+            </span>
+          )}
         </div>
       )}
 

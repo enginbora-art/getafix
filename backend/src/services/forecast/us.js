@@ -289,8 +289,21 @@ function buildUsSentPromptWithFinnhub(stockBlock, todayStr, finnhubData) {
     if (data.insider?.length > 0) {
       const buys = data.insider.filter((t) => t.transactionCode === 'P');
       const sells = data.insider.filter((t) => t.transactionCode === 'S');
-      if (buys.length > 0) section += `Insider buying: ${buys.length} transactions\n`;
-      if (sells.length > 0) section += `Insider selling: ${sells.length} transactions\n`;
+      if (buys.length > 0) {
+        const totalBuyShares = buys.reduce((sum, t) => sum + Math.abs(t.change || 0), 0);
+        section += `Insider BUYING: ${buys.length} transactions, ${totalBuyShares.toLocaleString()} shares total\n`;
+        section += `Latest buyer: ${buys[0]?.name} on ${buys[0]?.transactionDate}\n`;
+      }
+      if (sells.length > 0) {
+        const totalSellShares = sells.reduce((sum, t) => sum + Math.abs(t.change || 0), 0);
+        section += `Insider SELLING: ${sells.length} transactions, ${totalSellShares.toLocaleString()} shares total\n`;
+        if (sells.length > buys.length) {
+          section += `⚠️ Insider selling outpaces buying — flag this in sentiment analysis\n`;
+        }
+      }
+      if (buys.length === 0 && sells.length === 0) {
+        section += `Insider activity: None in recent period\n`;
+      }
     }
     if (data.recommendations?.length > 0) {
       const r = data.recommendations[0];
