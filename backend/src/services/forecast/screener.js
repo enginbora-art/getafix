@@ -185,6 +185,13 @@ function prefilterUs(tech, fund, spyReturns, filters) {
     if (revGrowth > 20) score += 1.0;
     if (epsGrowth > 20) score += 0.5;
 
+    // Short squeeze potential
+    const shortFloat = f.shortFloat || 0;
+    const shortRatio = f.shortRatio || 0;
+    if (shortFloat > 0.20) score += 2.0;
+    if (shortFloat > 0.30) score += 1.5;
+    if (shortRatio > 5) score += 1.0;
+
     scored.push({ ticker, score: Math.round(score * 1000) / 1000, rsScore });
   }
 

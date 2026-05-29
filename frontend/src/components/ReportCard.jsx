@@ -22,6 +22,7 @@ export default function ReportCard({ report }) {
   const risk = RISK_CONFIG[report.riskLevel] || RISK_CONFIG['Orta']
   const RiskIcon = risk.Icon
   const insiderSignal = report.market === 'US' ? (report.jsonData?.insider_signal || null) : null
+  const shortSqueeze = report.market === 'US' ? (report.jsonData?.short_squeeze === true) : false
 
   const handlePdf = async (e) => {
     e.stopPropagation()
@@ -121,7 +122,7 @@ export default function ReportCard({ report }) {
         </div>
       )}
 
-      {(report.riskLevel || insiderSignal) && (
+      {(report.riskLevel || insiderSignal || shortSqueeze) && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           {report.riskLevel && (
             <div className={`badge border gap-1 ${risk.color}`}>
@@ -136,6 +137,11 @@ export default function ReportCard({ report }) {
           {insiderSignal === 'BEARISH' && (
             <span style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontSize: '10px', padding: '2px 8px', borderRadius: '4px', border: '0.5px solid rgba(239,68,68,0.2)', fontWeight: 500 }}>
               👤 Insider Satım
+            </span>
+          )}
+          {shortSqueeze && (
+            <span style={{ background: 'rgba(249,115,22,0.1)', color: '#f97316', fontSize: '10px', padding: '2px 8px', borderRadius: '4px', border: '0.5px solid rgba(249,115,22,0.2)', fontWeight: 500 }}>
+              🔥 Squeeze Adayı
             </span>
           )}
         </div>

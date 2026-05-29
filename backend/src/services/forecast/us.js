@@ -201,6 +201,8 @@ async function fetchFundamentalSnapshot(tickers) {
         roe_pct: safe(fd.returnOnEquity, 100),
         beta: safe(ks.beta),
         debt_to_equity: safe(fd.debtToEquity),
+        shortFloat: ks.shortPercentOfFloat != null ? Math.round(ks.shortPercentOfFloat * 10000) / 10000 : null,
+        shortRatio: ks.shortRatio != null ? Math.round(ks.shortRatio * 100) / 100 : null,
       },
     };
   }, 10, 'US-temel');
@@ -228,7 +230,10 @@ function compressForAgent(techSubset, fundSubset, spyReturns) {
       `vsSMA50=${tech.vs_sma50_pct}% GX=${tech.golden_cross ? 'Y' : 'N'} Vol=${tech.volume_trend} | ` +
       `RS_SPY_1M=${rs1m} RS_SPY_3M=${rs3m} | ` +
       `${fund.market_cap_segment}cap ${fund.sector} | ` +
-      `PE_fwd=${fund.pe_forward ?? 'N/A'} RevGr=${fund.revenue_growth_pct ?? 'N/A'}% Beta=${fund.beta ?? 'N/A'}`,
+      `PE_fwd=${fund.pe_forward ?? 'N/A'} RevGr=${fund.revenue_growth_pct ?? 'N/A'}% Beta=${fund.beta ?? 'N/A'}` +
+      (fund.shortFloat != null
+        ? ` | ShortFloat=${(fund.shortFloat * 100).toFixed(1)}%${fund.shortFloat > 0.20 ? ' ⚠️HIGH' : ''}${fund.shortRatio ? ` DTC=${fund.shortRatio}d` : ''}`
+        : ''),
     );
   }
   lines.push(`\nSPY: 1M=${spyReturns['1m']}%  3M=${spyReturns['3m']}%  6M=${spyReturns['6m']}%`);

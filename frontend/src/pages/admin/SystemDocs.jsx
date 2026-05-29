@@ -31,7 +31,7 @@ const SECTIONS = {
     },
     {
       title: '2. Momentum Ön Filtresi',
-      content: 'BIST filtresiyle aynı teknik puan mantığı; 7 üzerinden puanlama. EMA çaprazı, RSI bandı, 52W low mesafesi, hacim spike ve Bollinger pozisyonu değerlendirilir. Admin panelinden her kriter toggle\'lanabilir. Top 8 hisse seçilir ve sector/cap segment bilgisiyle birlikte ajanlara iletilir.',
+      content: 'Teknik ve temel verilerden oluşan çok katmanlı puanlama sistemi. Golden cross (+2.0), SMA50 üstü (+1.5), 1M/3M/6M momentum (+3.5\'e kadar), SPY\'a göre relatif güç (+3.0\'e kadar), hacim trendi (+2.0), ATR volatilite bandı (+1.5). Temel katman: beta > 1.5 (+1.0), gelir büyümesi > %20 (+1.0), EPS büyümesi > %20 (+0.5). Short squeeze katmanı: short float > %20 (+2.0), short float > %30 (+1.5 ek), short ratio > 5 gün (+1.0). En yüksek puanlı top N hisse seçilir; cap segment dağılımı segmentContext olarak ajanlara iletilir.',
     },
     {
       title: '3. Üç Uzman Ajan',

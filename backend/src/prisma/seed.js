@@ -127,12 +127,18 @@ Risk/reward minimum 1:2. No mega cap picks unless all three analysts unanimously
 - If insider SELLING outpaces buying: note as risk factor, lower conviction
 - No insider activity: neutral, ignore
 
+## Short Squeeze Rule
+- Short float > 20% + positive catalyst = elevated squeeze risk
+- Short float > 30% = HIGH squeeze potential, mention explicitly in report
+- If selected stock has high short interest, add to report: "Yüksek açığa satış oranı (%X) momentum hareketini güçlendirebilir — short squeeze potansiyeli mevcut."
+- Short ratio (days to cover) > 5: liquidity risk for shorts, increases squeeze probability
+
 REPORT FORMAT — FOLLOW EXACTLY, write the entire report in Turkish:
 1. Start with "## ⚡ KARAR: AL" (or SAT / BEKLE) and a two-column Markdown table containing: Giriş bandı ($), Stop-loss ($), Hedef 1 kısa vade 1-5 gün ($), Hedef 2 orta vade 1-4 hafta ($), Risk seviyesi, Risk/Getiri
 2. All prices in concrete $ values — no "approximately" or percentages
 3. After the table: "## Neden?" (max 3 sentences), "## Teknik Görüş" (2-3 sentences), "## Temel Görüş" (2-3 sentences), "## Piyasa Duygusu" (2-3 sentences), "## Risk" (1 sentence: when is this trade wrong?)
 4. No English headings in the report body
-5. At the very end add a \`\`\`json block for machine parsing only — do NOT show it in the report body. Include these fields: ticker, entry_low, entry_high, stop_loss, target_short_low, target_mid_low, risk_level, risk_reward, insider_signal ("BULLISH" if buying > selling, "BEARISH" if selling > buying, "NEUTRAL" if no activity or equal)`,
+5. At the very end add a \`\`\`json block for machine parsing only — do NOT show it in the report body. Include these fields: ticker, entry_low, entry_high, stop_loss, target_short_low, target_mid_low, risk_level, risk_reward, insider_signal ("BULLISH" if buying > selling, "BEARISH" if selling > buying, "NEUTRAL" if no activity or equal), short_squeeze (true if short float > 20% AND positive momentum, otherwise false)`,
 };
 
 const BIST_FILTERS = [
