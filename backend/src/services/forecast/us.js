@@ -211,6 +211,10 @@ async function fetchFundamentalSnapshot(tickers) {
   for (const r of results) {
     if (r.status === 'fulfilled' && r.value) {
       result[r.value.ticker] = r.value.data;
+      const d = r.value.data;
+      if (d.shortFloat != null) {
+        console.log(`  [ShortFloat] ${r.value.ticker}: ${(d.shortFloat * 100).toFixed(1)}% | ratio=${d.shortRatio?.toFixed(1) ?? 'N/A'}d`);
+      }
     }
   }
   return result;
@@ -363,6 +367,15 @@ async function runUsForecast(isClosing = false, isManual = false) {
 
   const { candidates, segmentContext } = prefilterUs(techFull, fundFull, spyReturns, filters);
   console.log(`[US] Prefilter: top ${candidates.length} hisse seçildi — ${candidates.join(', ')}`);
+  console.log('[US] Short Float verileri:');
+  candidates.forEach((ticker) => {
+    const snap = fundFull[ticker];
+    if (snap?.shortFloat != null) {
+      console.log(`  ${ticker}: ShortFloat=${(snap.shortFloat * 100).toFixed(1)}% shortRatio=${snap.shortRatio?.toFixed(1) ?? 'N/A'}d`);
+    } else {
+      console.log(`  ${ticker}: ShortFloat=N/A`);
+    }
+  });
 
   const stockBlock = compressForAgent(
     Object.fromEntries(candidates.map((t) => [t, techFull[t]])),
