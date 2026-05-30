@@ -504,7 +504,7 @@ async function runUsForecast(isClosing = false, isManual = false) {
   await parseAndSaveKapNotices(r1sent.text, 'US', report.id);
   if (Object.keys(finnhubData).length > 0) await importFinnhubKapNotices(finnhubData, report.id);
 
-  if (!isManual) {
+  if (!isManual && !isClosing) {
     await sendForecastEmail(managerOut, 'US', now);
   }
   console.log(`[US] Tamamlandı — toplam süre: ${Math.round((Date.now() - t0) / 1000)}s`);
