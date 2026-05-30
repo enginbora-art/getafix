@@ -53,4 +53,24 @@ async function getRecommendationTrends(symbol) {
   }
 }
 
-module.exports = { getCompanyNews, getNewsSentiment, getInsiderTransactions, getRecommendationTrends };
+async function getEarningsCalendar(from, to) {
+  try {
+    const { data } = await axios.get(`${BASE}/calendar/earnings`, { params: { from, to, token: token() } });
+    return data?.earningsCalendar || [];
+  } catch (err) {
+    console.error('[Finnhub] Earnings calendar hatası:', err.message);
+    return [];
+  }
+}
+
+async function getEarningsSurprises(symbol) {
+  try {
+    const { data } = await axios.get(`${BASE}/stock/earnings`, { params: { symbol, limit: 4, token: token() } });
+    return data || [];
+  } catch (err) {
+    console.error(`[Finnhub] Earnings surprise hatası ${symbol}:`, err.message);
+    return [];
+  }
+}
+
+module.exports = { getCompanyNews, getNewsSentiment, getInsiderTransactions, getRecommendationTrends, getEarningsCalendar, getEarningsSurprises };

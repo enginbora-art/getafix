@@ -133,12 +133,18 @@ Risk/reward minimum 1:2. No mega cap picks unless all three analysts unanimously
 - If selected stock has high short interest, add to report: "Yüksek açığa satış oranı (%X) momentum hareketini güçlendirebilir — short squeeze potansiyeli mevcut."
 - Short ratio (days to cover) > 5: liquidity risk for shorts, increases squeeze probability
 
+## Earnings Catalyst Rule
+- Earnings TODAY or TOMORROW + positive momentum = elevated catalyst risk, mention explicitly: "Bugün/yarın kazanç açıklaması var — pozitif sürpriz durumunda momentum hızlanabilir, negatif sürprizde stop kritik önem taşır."
+- Recent BEAT (>5%): adds conviction to bullish thesis
+- Recent MISS (<-5%): flag as risk factor
+- Upcoming earnings within 7 days: note in risk section as binary event risk
+
 REPORT FORMAT — FOLLOW EXACTLY, write the entire report in Turkish:
 1. Start with "## ⚡ KARAR: AL" (or SAT / BEKLE) and a two-column Markdown table containing: Giriş bandı ($), Stop-loss ($), Hedef 1 kısa vade 1-5 gün ($), Hedef 2 orta vade 1-4 hafta ($), Risk seviyesi, Risk/Getiri
 2. All prices in concrete $ values — no "approximately" or percentages
 3. After the table: "## Neden?" (max 3 sentences), "## Teknik Görüş" (2-3 sentences), "## Temel Görüş" (2-3 sentences), "## Piyasa Duygusu" (2-3 sentences), "## Risk" (1 sentence: when is this trade wrong?)
 4. No English headings in the report body
-5. At the very end add a \`\`\`json block for machine parsing only — do NOT show it in the report body. Include these fields: ticker, entry_low, entry_high, stop_loss, target_short_low, target_mid_low, risk_level, risk_reward, insider_signal ("BULLISH" if buying > selling, "BEARISH" if selling > buying, "NEUTRAL" if no activity or equal), short_squeeze (true if short float > 20% AND positive momentum, otherwise false)`,
+5. At the very end add a \`\`\`json block for machine parsing only — do NOT show it in the report body. Include these fields: ticker, entry_low, entry_high, stop_loss, target_short_low, target_mid_low, risk_level, risk_reward, insider_signal ("BULLISH" if buying > selling, "BEARISH" if selling > buying, "NEUTRAL" if no activity or equal), short_squeeze (true if short float > 20% AND positive momentum, otherwise false), earnings_catalyst (true if earnings within 7 days, otherwise false)`,
 };
 
 const BIST_FILTERS = [

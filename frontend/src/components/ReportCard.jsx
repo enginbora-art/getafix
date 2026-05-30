@@ -23,6 +23,7 @@ export default function ReportCard({ report }) {
   const RiskIcon = risk.Icon
   const insiderSignal = report.market === 'US' ? (report.jsonData?.insider_signal || null) : null
   const shortSqueeze = report.market === 'US' ? (report.jsonData?.short_squeeze === true) : false
+  const earningsCatalyst = report.market === 'US' ? (report.jsonData?.earnings_catalyst === true) : false
 
   const handlePdf = async (e) => {
     e.stopPropagation()
@@ -122,7 +123,7 @@ export default function ReportCard({ report }) {
         </div>
       )}
 
-      {(report.riskLevel || insiderSignal || shortSqueeze) && (
+      {(report.riskLevel || insiderSignal || shortSqueeze || earningsCatalyst) && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           {report.riskLevel && (
             <div className={`badge border gap-1 ${risk.color}`}>
@@ -142,6 +143,11 @@ export default function ReportCard({ report }) {
           {shortSqueeze && (
             <span style={{ background: 'rgba(249,115,22,0.1)', color: '#f97316', fontSize: '10px', padding: '2px 8px', borderRadius: '4px', border: '0.5px solid rgba(249,115,22,0.2)', fontWeight: 500 }}>
               🔥 Squeeze Adayı
+            </span>
+          )}
+          {earningsCatalyst && (
+            <span style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', fontSize: '10px', padding: '2px 8px', borderRadius: '4px', border: '0.5px solid rgba(251,191,36,0.2)', fontWeight: 500 }}>
+              📅 Kazanç Yaklaşıyor
             </span>
           )}
         </div>

@@ -5,7 +5,7 @@ const { sendForecastEmail } = require('../email');
 const prisma = require('../../lib/prisma');
 const { logUsage, calculateCost } = require('../../lib/costTracker');
 const { checkPortfolioAlerts, parseAndSaveKapNotices } = require('./alertChecker');
-const { getCompanyNews, getInsiderTransactions, getRecommendationTrends } = require('../../lib/finnhub');
+const { getCompanyNews, getInsiderTransactions, getRecommendationTrends, getEarningsCalendar, getEarningsSurprises } = require('../../lib/finnhub');
 
 // S&P 500 Core + S&P 400 Mid Cap + Russell Liquid — sp500_russell.txt ile senkronize
 const US_WATCHLIST = [
@@ -267,17 +267,54 @@ function buildUsSentPrompt(stockBlock, todayStr) {
   return `Today is ${todayStr}. Find news, catalysts, and sentiment for:\n\n${stockBlock}\n\nFor each stock: IGNITION / NEUTRAL / HEADWIND + specific catalyst. Mark unverified info as RUMOR.\n\nIMPORTANT: If you find significant filings or events for any stock in the last 7 days (SEC filings, earnings announcements, insider buying/selling, major contracts, M&A activity, management changes, dividend declarations, guidance updates), append this block at the END of your report:\n\n\`\`\`kap\n[\n  {\n    "ticker": "AAPL",\n    "title": "Q2 Earnings Beat Expectations",\n    "summary": "Apple reported Q2 EPS of $1.53 vs $1.43 expected. Revenue grew 5% YoY driven by services.",\n    "impact": "POZITIF",\n    "sourceDate": "2026-05-24"\n  }\n]\n\`\`\`\n\nimpact values: "POZITIF" | "NEGATIF" | "NOTR". Only include material events. Skip routine or immaterial filings.`;
 }
 
-async function fetchFinnhubData(tickers) {
+async function fetchEarningsCalendar(tickers) {
+  if (!process.env.FINNHUB_API_KEY) return {};
+  try {
+    const today = new Date();
+    const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const from = today.toISOString().split('T')[0];
+    const to = nextWeek.toISOString().split('T')[0];
+    const calendar = await getEarningsCalendar(from, to);
+    const map = {};
+    calendar.forEach((e) => {
+      if (tickers.includes(e.symbol)) {
+        map[e.symbol] = { date: e.date, hour: e.hour, epsEstimate: e.epsEstimate };
+      }
+    });
+    const hits = Object.keys(map);
+    if (hits.length > 0) {
+      console.log(`[US] Earnings calendar: ${hits.length} hisse bu hafta kazanç açıklıyor — ${hits.join(', ')}`);
+    }
+    return map;
+  } catch (err) {
+    console.error('[Finnhub] Earnings calendar fetch hatası:', err.message);
+    return {};
+  }
+}
+
+async function fetchFinnhubData(tickers, earningsCalendar = {}) {
   if (!process.env.FINNHUB_API_KEY) return {};
   const results = {};
   for (const ticker of tickers) {
     try {
-      const [news, insider, recommendations] = await Promise.all([
+      const [news, insider, recommendations, surprises] = await Promise.all([
         getCompanyNews(ticker),
         getInsiderTransactions(ticker),
         getRecommendationTrends(ticker),
+        getEarningsSurprises(ticker),
       ]);
-      results[ticker] = { news, insider, recommendations };
+      const lastEarnings = surprises?.[0];
+      const epsSurprisePct = lastEarnings?.actual != null && lastEarnings?.estimate != null && Math.abs(lastEarnings.estimate) > 0
+        ? Math.round(((lastEarnings.actual - lastEarnings.estimate) / Math.abs(lastEarnings.estimate)) * 1000) / 10
+        : null;
+      results[ticker] = {
+        news,
+        insider,
+        recommendations,
+        earningsUpcoming: earningsCalendar[ticker] || null,
+        lastEpsSurprisePct: epsSurprisePct,
+        lastEarningsDate: lastEarnings?.period || null,
+      };
       await new Promise((r) => setTimeout(r, 200));
     } catch (err) {
       console.error(`[Finnhub] ${ticker} hatası:`, err.message);
@@ -318,6 +355,18 @@ function buildUsSentPromptWithFinnhub(stockBlock, todayStr, finnhubData) {
     if (data.recommendations?.length > 0) {
       const r = data.recommendations[0];
       section += `Analyst consensus: Buy=${r.buy} Hold=${r.hold} Sell=${r.sell}\n`;
+    }
+    if (data.earningsUpcoming) {
+      const daysUntil = Math.ceil((new Date(data.earningsUpcoming.date) - new Date()) / (1000 * 60 * 60 * 24));
+      const timing = data.earningsUpcoming.hour === 'amc' ? 'kapanış sonrası' : 'açılış öncesi';
+      section += `⚡ EARNINGS: ${data.earningsUpcoming.date} (${daysUntil} gün sonra, ${timing})\n`;
+    }
+    if (data.lastEpsSurprisePct != null) {
+      const sign = data.lastEpsSurprisePct > 0 ? '+' : '';
+      section += `Son kazanç sürprizi: ${sign}${data.lastEpsSurprisePct.toFixed(1)}%`;
+      if (data.lastEpsSurprisePct > 5) section += ` ✓ BEAT\n`;
+      else if (data.lastEpsSurprisePct < -5) section += ` ✗ MISS\n`;
+      else section += ` (inline)\n`;
     }
   }
   return buildUsSentPrompt(stockBlock, todayStr) + section;
@@ -366,7 +415,10 @@ async function runUsForecast(isClosing = false, isManual = false) {
   const fundFail = techSuccess - fundSuccess;
   console.log(`[US] Temel veri tamamlandı: ${fundSuccess} başarılı, ${fundFail} hata`);
 
-  const { candidates, segmentContext } = prefilterUs(techFull, fundFull, spyReturns, filters);
+  console.log('[US] Earnings calendar çekiliyor...');
+  const earningsCalendar = await fetchEarningsCalendar(Object.keys(techFull));
+
+  const { candidates, segmentContext } = prefilterUs(techFull, fundFull, spyReturns, filters, earningsCalendar);
   console.log(`[US] Prefilter: top ${candidates.length} hisse seçildi — ${candidates.join(', ')}`);
   console.log('[US] Short Float verileri:');
   candidates.forEach((ticker) => {
@@ -395,7 +447,7 @@ async function runUsForecast(isClosing = false, isManual = false) {
   await logUsage({ requestType: 'scheduled', market: 'US', agentName: 'fundamental', inputTokens: r1fund.inputTokens, outputTokens: r1fund.outputTokens });
 
   console.log('[US] Finnhub verisi çekiliyor...');
-  const finnhubData = await fetchFinnhubData(candidates);
+  const finnhubData = await fetchFinnhubData(candidates, earningsCalendar);
   console.log(`[US] Finnhub verisi tamamlandı (${Object.keys(finnhubData).length} hisse)`);
 
   console.log('[US] Ajan 3 (sentiment/web) başlıyor...');
@@ -562,7 +614,8 @@ async function runManualAnalysis(ticker, onStep = null, context = {}) {
   await logUsage({ userId, requestType: 'manual', market: 'US', agentName: 'fundamental', inputTokens: r1fund.inputTokens, outputTokens: r1fund.outputTokens, ticker });
 
   await onStep?.('Ajan 3 — Haberler ve piyasa duygusu taranıyor...');
-  const finnhubDataManual = await fetchFinnhubData([ticker]);
+  const earningsCalendarManual = await fetchEarningsCalendar([ticker]);
+  const finnhubDataManual = await fetchFinnhubData([ticker], earningsCalendarManual);
   const sentPromptManual = finnhubDataManual[ticker]
     ? buildUsSentPromptWithFinnhub(stockBlock, todayStr, finnhubDataManual)
     : buildUsSentPrompt(stockBlock, todayStr);

@@ -119,7 +119,7 @@ function prefilterBist(tech, fund, filters) {
   return scored.slice(0, topN).map(([t]) => t);
 }
 
-function prefilterUs(tech, fund, spyReturns, filters) {
+function prefilterUs(tech, fund, spyReturns, filters, earningsData = {}) {
   const { topN, minDollarVolume, minPrice, atrMin, atrMax } = filters;
   const scored = [];
 
@@ -191,6 +191,15 @@ function prefilterUs(tech, fund, spyReturns, filters) {
     if (shortFloat > 0.20) score += 2.0;
     if (shortFloat > 0.30) score += 1.5;
     if (shortRatio > 5) score += 1.0;
+
+    // Earnings catalyst
+    const earnings = earningsData[ticker];
+    if (earnings?.date) {
+      const daysUntil = Math.ceil((new Date(earnings.date) - new Date()) / (1000 * 60 * 60 * 24));
+      if (daysUntil === 0 || daysUntil === 1) score += 2.5;
+      else if (daysUntil <= 3) score += 1.5;
+      else if (daysUntil <= 7) score += 0.75;
+    }
 
     scored.push({ ticker, score: Math.round(score * 1000) / 1000, rsScore });
   }
