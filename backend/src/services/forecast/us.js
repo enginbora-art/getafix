@@ -20,6 +20,7 @@ const US_WATCHLIST = [
   'ICE',  'CME',  'MCO',  'MSCI', 'CARR',  'AMD',   'INTC', 'MU',   'AMAT', 'LRCX',
   'KLAC', 'MRVL', 'CDNS', 'SNPS', 'FTNT',  'PANW',  'CRWD', 'ZS',   'DDOG', 'NET',
   'SNOW', 'PLTR', 'APP',  'HOOD', 'COIN',  'MSTR',
+  'DELL', 'OKTA', 'PD',   'PATH',
   // S&P 400 Mid Cap
   'GLOB', 'SM',   'CHRD', 'RRC',  'AR',    'EQT',   'CNX',  'MTDR', 'FANG', 'VNOM',
   'CTRA', 'OVV',  'CRC',  'MGY',  'TALO',  'BATL',  'WTTR', 'NINE', 'KLXE', 'OIS',
