@@ -260,6 +260,18 @@ function parseForecastJson(text) {
   }
 }
 
+function parseDualForecast(text) {
+  const parts = text.split(/(?=##\s*⚡\s*KARAR:)/i);
+  const sections = parts.filter((s) => /##\s*⚡\s*KARAR:/i.test(s));
+  if (sections.length === 0) return [];
+  return sections.map((section) => {
+    const tickerMatch = section.match(/##\s*⚡\s*KARAR:\s*(?:AL|SAT|BEKLE)\s*[—\-]+\s*([A-Z0-9]+)/i);
+    const ticker = tickerMatch?.[1] || null;
+    const rec = parseForecastJson(section);
+    return { content: section.trim(), ticker: ticker || rec?.ticker || null, rec };
+  });
+}
+
 function buildUsTechPrompt(stockBlock, todayStr) {
   return `Today is ${todayStr}. Analyze these US stocks:\n\n${stockBlock}\n\nFor each stock: BUY / WAIT / AVOID + one-line reason.`;
 }
@@ -480,43 +492,77 @@ async function runUsForecast(isClosing = false, isManual = false) {
 
   const managerPrompt = buildUsManagerPrompt(candidates, segmentContext, sum1, sum2, sum3, stockBlock, todayStr);
   console.log('[US] Yönetici sentez başlıyor...');
-  const rManager = await callAgent('US', 'manager', managerPrompt, 3000);
+  const rManager = await callAgent('US', 'manager', managerPrompt, 5000);
   console.log(`[US] Yönetici sentez tamamlandı (${rManager.inputTokens} in / ${rManager.outputTokens} out token)`);
   await logUsage({ requestType: 'scheduled', market: 'US', agentName: 'manager', inputTokens: rManager.inputTokens, outputTokens: rManager.outputTokens });
 
   const managerOut = rManager.text;
-  const rec = parseForecastJson(managerOut);
+  let forecastSections = parseDualForecast(managerOut);
+  if (forecastSections.length === 0) {
+    forecastSections = [{ content: managerOut, ticker: null, rec: parseForecastJson(managerOut) }];
+  }
+  console.log(`[US] ${forecastSections.length} rapor bölümü parse edildi — ${forecastSections.map((s) => s.ticker || '?').join(', ')}`);
 
-  const report = await prisma.report.create({
-    data: {
-      market: 'US',
-      type: isManual ? 'MANUAL' : 'SCHEDULED',
-      date: now,
-      content: managerOut,
-      jsonData: rec || undefined,
-      ticker: rec?.ticker || null,
-      entryLow: rec?.entry_low || null,
-      entryHigh: rec?.entry_high || null,
-      stopLoss: rec?.stop_loss || null,
-      targetShort: rec?.target_short_low || null,
-      targetMid: rec?.target_mid_low || null,
-      riskLevel: rec?.risk_level || null,
-      isClosing,
-    },
-  });
-  console.log(`[US] Rapor kaydedildi — ID: ${report.id}`);
-  await checkPortfolioAlerts('US', report);
-  await parseAndSaveKapNotices(r1sent.text, 'US', report.id);
-  if (Object.keys(finnhubData).length > 0) await importFinnhubKapNotices(finnhubData, report.id);
+  const savedReports = [];
+  for (const section of forecastSections) {
+    const rec = section.rec;
+    const report = await prisma.report.create({
+      data: {
+        market: 'US',
+        type: isManual ? 'MANUAL' : 'SCHEDULED',
+        date: now,
+        content: section.content,
+        jsonData: rec || undefined,
+        ticker: section.ticker || rec?.ticker || null,
+        entryLow: rec?.entry_low || null,
+        entryHigh: rec?.entry_high || null,
+        stopLoss: rec?.stop_loss || null,
+        targetShort: rec?.target_short_low || null,
+        targetMid: rec?.target_mid_low || null,
+        riskLevel: rec?.risk_level || null,
+        isClosing,
+      },
+    });
+    console.log(`[US] Rapor kaydedildi — ID: ${report.id} ticker=${section.ticker}`);
+    savedReports.push(report);
+    await checkPortfolioAlerts('US', report);
+  }
+
+  if (savedReports.length > 0) {
+    await parseAndSaveKapNotices(r1sent.text, 'US', savedReports[0].id);
+    if (Object.keys(finnhubData).length > 0) await importFinnhubKapNotices(finnhubData, savedReports[0].id);
+  }
 
   if (!isManual && !isClosing) {
-    await sendForecastEmail(managerOut, 'US', now);
+    const tickers = forecastSections.map((s) => s.ticker).filter(Boolean);
+    const emailSubject = tickers.length > 0
+      ? `US Günlük Öneri — ${tickers.map((t, i) => `${i + 1}. Seçim: ${t}`).join(', ')} — ${todayStr}`
+      : undefined;
+    const combined = forecastSections.map((s) => s.content).join('\n\n---\n\n');
+    await sendForecastEmail(combined, 'US', now, emailSubject ? { subject: emailSubject } : {});
   }
   console.log(`[US] Tamamlandı — toplam süre: ${Math.round((Date.now() - t0) / 1000)}s`);
   return managerOut;
 }
 
 function buildUsManagerPrompt(candidates, segmentContext, sum1, sum2, sum3, stockBlock, todayStr) {
+  const jsonBlock = `{
+  "date": "${todayStr}",
+  "ticker": "TICKER",
+  "entry_low": 0.00,
+  "entry_high": 0.00,
+  "stop_loss": 0.00,
+  "target_short_low": 0.00,
+  "target_short_high": 0.00,
+  "target_mid_low": 0.00,
+  "target_mid_high": 0.00,
+  "year_end": 0.00,
+  "risk_level": "Düşük/Orta/Yüksek",
+  "risk_reward": "1:X.X",
+  "insider_signal": "NEUTRAL",
+  "short_squeeze": false,
+  "earnings_catalyst": false
+}`;
   return `Today is ${todayStr}. Stocks under analysis: ${candidates.join(', ')}
 
 MARKET SEGMENT CONTEXT:
@@ -531,13 +577,15 @@ ${sum3}
 Raw quantitative data:
 ${stockBlock}
 
-GÖREV — Aşağıdaki FORMATI BİREBİR kullanarak TÜRKÇE Markdown rapor yaz:
+GÖREV — EN İYİ 2 hisseyi seç. Her biri için aşağıdaki FORMATI BİREBİR kullanarak TÜRKÇE ayrı rapor bölümü yaz.
 
----RAPOR BAŞLANGICI---
+Seçim kuralları:
+- Birbirine çok benzer sektörden olmasın (iki kripto madenci, iki yarı iletken seçme)
+- İkisi de AL veya BEKLE olabilir; Risk/getiri en az 1:2
 
 # US Momentum Günlük Öneri — ${todayStr}
 
-## ⚡ KARAR: [AL veya SAT veya BEKLE]
+## ⚡ KARAR: [AL veya BEKLE] — [BİRİNCİ_TICKER]
 
 | | |
 |---|---|
@@ -552,10 +600,8 @@ GÖREV — Aşağıdaki FORMATI BİREBİR kullanarak TÜRKÇE Markdown rapor yaz
 > Yıl Sonu Beklentisi: Mevcut makro koşullar ve şirket fundamentalleri devam ederse yıl sonunda (31 Aralık 2026) beklenen fiyat seviyesi.
 | **Risk/Getiri** | 1:X.X |
 
----
-
 ## Neden?
-[Bu hisseyi seçme gerekçesi — max 3 cümle. Neden bu hisse, neden şimdi, segment bağlamıyla açıkla.]
+[Bu hisseyi seçme gerekçesi — max 3 cümle, segment bağlamıyla açıkla.]
 
 ## Teknik Görüş
 [RSI, ATR, MA, hacim, SPY'a göre güç — 2-3 cümle]
@@ -567,30 +613,52 @@ GÖREV — Aşağıdaki FORMATI BİREBİR kullanarak TÜRKÇE Markdown rapor yaz
 [Haberler, katalizörler, makro — 2-3 cümle]
 
 ## Risk
-Bu öneri ne zaman yanlış olur? [Tek cümle]
+[Bu öneri ne zaman yanlış olur? — 1 cümle]
 
 ---
 > Yatırım tavsiyesi değildir.
 
----RAPOR SONU---
+\`\`\`json
+${jsonBlock}
+\`\`\`
 
-Raporun TAMAMEN SONUNA şu JSON bloğunu ekle (kullanıcıya gösterilmeyecek):
+---
+
+## ⚡ KARAR: [AL veya BEKLE] — [İKİNCİ_TICKER]
+
+| | |
+|---|---|
+| **Hisse** | TICKER ([segment] cap, [sector]) |
+| **Giriş bandı** | $XXX – $XXX |
+| **Stop-loss** | $XXX |
+| **Hedef 1 (kısa vade, 1-5 gün)** | $XXX |
+| **Hedef 2 (orta vade, 1-4 hafta)** | $XXX |
+| **Yıl Sonu Beklentisi** | $XXX |
+| **Risk seviyesi** | Düşük / Orta / Yüksek |
+
+> Yıl Sonu Beklentisi: Mevcut makro koşullar ve şirket fundamentalleri devam ederse yıl sonunda (31 Aralık 2026) beklenen fiyat seviyesi.
+| **Risk/Getiri** | 1:X.X |
+
+## Neden?
+[İkinci hisseyi seçme gerekçesi — max 3 cümle.]
+
+## Teknik Görüş
+[2-3 cümle]
+
+## Temel Görüş
+[2-3 cümle]
+
+## Piyasa Duygusu
+[2-3 cümle]
+
+## Risk
+[1 cümle]
+
+---
+> Yatırım tavsiyesi değildir.
 
 \`\`\`json
-{
-  "date": "${todayStr}",
-  "ticker": "TICKER",
-  "entry_low": 0.00,
-  "entry_high": 0.00,
-  "stop_loss": 0.00,
-  "target_short_low": 0.00,
-  "target_short_high": 0.00,
-  "target_mid_low": 0.00,
-  "target_mid_high": 0.00,
-  "year_end": 0.00,
-  "risk_level": "Düşük/Orta/Yüksek",
-  "thesis_summary": "Tez özeti."
-}
+${jsonBlock}
 \`\`\``;
 }
 

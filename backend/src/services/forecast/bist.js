@@ -173,6 +173,19 @@ function parseForecastJson(text) {
   }
 }
 
+function parseDualForecast(text) {
+  // Split at each "## ⚡ KARAR:" heading (lookahead keeps heading with its section)
+  const parts = text.split(/(?=##\s*⚡\s*KARAR:)/i);
+  const sections = parts.filter((s) => /##\s*⚡\s*KARAR:/i.test(s));
+  if (sections.length === 0) return [];
+  return sections.map((section) => {
+    const tickerMatch = section.match(/##\s*⚡\s*KARAR:\s*(?:AL|SAT|BEKLE)\s*[—\-]+\s*([A-Z0-9.]+)/i);
+    const ticker = (tickerMatch?.[1] || '').replace(/\.IS$/i, '') || null;
+    const rec = parseForecastJson(section);
+    return { content: section.trim(), ticker: ticker || rec?.ticker || null, rec };
+  });
+}
+
 function buildTechPrompt(data, dateStr) {
   return `Aşağıdaki ön filtrelenmiş BIST kağıtlarının teknik snapshot'ı verilmiştir.\nTarih: ${dateStr}\n\nVERİ:\n${JSON.stringify(data, null, 2)}\n\nGörev:\n1. Her kağıt için trend, momentum, RSI yorumu, hacim okuması\n2. SMA20/SMA50 kesişimleri ve fiyat-MA pozisyonunu yorumla\n3. Aşırı alım/satım uyarıları\n4. TOP 3 teknik açıdan en iyi kağıdı seç ve gerekçelendir\n5. Her TOP 3 kağıt için risk seviyesi (1-10)\n\nÖzlü ol, gevezelik etme.`;
 }
@@ -246,36 +259,54 @@ async function runBistForecast(isClosing = false, isManual = false) {
 
   const managerPrompt = buildManagerPrompt(r2tech.text, r2fund.text, r1sent.text, dateStr, bistCodes);
   console.log('[BIST] Yönetici sentez başlıyor...');
-  const rManager = await callAgent('BIST', 'manager', managerPrompt, 3000);
+  const rManager = await callAgent('BIST', 'manager', managerPrompt, 5000);
   console.log(`[BIST] Yönetici sentez tamamlandı (${rManager.inputTokens} in / ${rManager.outputTokens} out token)`);
   await logUsage({ requestType: 'scheduled', market: 'BIST', agentName: 'manager', inputTokens: rManager.inputTokens, outputTokens: rManager.outputTokens });
 
   const finalReport = rManager.text;
-  const rec = parseForecastJson(finalReport);
+  let forecastSections = parseDualForecast(finalReport);
+  if (forecastSections.length === 0) {
+    // Fallback: tek bölüm olarak kaydet
+    forecastSections = [{ content: finalReport, ticker: null, rec: parseForecastJson(finalReport) }];
+  }
+  console.log(`[BIST] ${forecastSections.length} rapor bölümü parse edildi — ${forecastSections.map((s) => s.ticker || '?').join(', ')}`);
 
-  const report = await prisma.report.create({
-    data: {
-      market: 'BIST',
-      type: isManual ? 'MANUAL' : 'SCHEDULED',
-      date: now,
-      content: finalReport,
-      jsonData: rec || undefined,
-      ticker: rec?.ticker || null,
-      entryLow: rec?.entry_low || null,
-      entryHigh: rec?.entry_high || null,
-      stopLoss: rec?.stop_loss || null,
-      targetShort: rec?.target_short_low || null,
-      targetMid: rec?.target_mid_low || null,
-      riskLevel: rec?.risk_level || null,
-      isClosing,
-    },
-  });
-  console.log(`[BIST] Rapor kaydedildi — ID: ${report.id}`);
-  await checkPortfolioAlerts('BIST', report);
-  await parseAndSaveKapNotices(r1sent.text, 'BIST', report.id);
+  const savedReports = [];
+  for (const section of forecastSections) {
+    const rec = section.rec;
+    const report = await prisma.report.create({
+      data: {
+        market: 'BIST',
+        type: isManual ? 'MANUAL' : 'SCHEDULED',
+        date: now,
+        content: section.content,
+        jsonData: rec || undefined,
+        ticker: section.ticker || rec?.ticker || null,
+        entryLow: rec?.entry_low || null,
+        entryHigh: rec?.entry_high || null,
+        stopLoss: rec?.stop_loss || null,
+        targetShort: rec?.target_short_low || null,
+        targetMid: rec?.target_mid_low || null,
+        riskLevel: rec?.risk_level || null,
+        isClosing,
+      },
+    });
+    console.log(`[BIST] Rapor kaydedildi — ID: ${report.id} ticker=${section.ticker}`);
+    savedReports.push(report);
+    await checkPortfolioAlerts('BIST', report);
+  }
+
+  if (savedReports.length > 0) {
+    await parseAndSaveKapNotices(r1sent.text, 'BIST', savedReports[0].id);
+  }
 
   if (!isManual && !isClosing) {
-    await sendForecastEmail(finalReport, 'BIST', now);
+    const tickers = forecastSections.map((s) => s.ticker).filter(Boolean);
+    const emailSubject = tickers.length > 0
+      ? `BIST Günlük Öneri — ${tickers.map((t, i) => `${i + 1}. Seçim: ${t}`).join(', ')} — ${now.toLocaleDateString('tr-TR')}`
+      : undefined;
+    const combined = forecastSections.map((s) => s.content).join('\n\n---\n\n');
+    await sendForecastEmail(combined, 'BIST', now, emailSubject ? { subject: emailSubject } : {});
   }
   console.log(`[BIST] Tamamlandı — toplam süre: ${Math.round((Date.now() - t0) / 1000)}s`);
   return finalReport;
@@ -283,6 +314,20 @@ async function runBistForecast(isClosing = false, isManual = false) {
 
 function buildManagerPrompt(techView, fundView, sentView, dateStr, bistCodes) {
   const today = new Date().toISOString().split('T')[0];
+  const jsonBlock = `{
+  "date": "${today}",
+  "ticker": "BIST_KODU",
+  "entry_low": 0.00,
+  "entry_high": 0.00,
+  "stop_loss": 0.00,
+  "target_short_low": 0.00,
+  "target_short_high": 0.00,
+  "target_mid_low": 0.00,
+  "target_mid_high": 0.00,
+  "year_end": 0.00,
+  "risk_level": "Düşük/Orta/Yüksek",
+  "thesis_summary": "Tez özeti, maksimum 2 cümle."
+}`;
   return `Üç uzman ajanın final değerlendirmeleri aşağıdadır.
 
 ═══ AJAN 1 — TEKNİK ANALİZ ═══
@@ -294,13 +339,15 @@ ${fundView}
 ═══ AJAN 3 — SENTIMENT / HABER ═══
 ${sentView}
 
-GÖREV — Aşağıdaki FORMATI BİREBİR kullanarak Markdown rapor yaz:
+GÖREV — EN İYİ 2 BIST hissesini seç. Her biri için aşağıdaki FORMATI BİREBİR kullanarak ayrı bir rapor bölümü yaz.
 
----RAPOR BAŞLANGICI---
+Seçim kuralları:
+- Birbirine çok benzer sektörden olmasın (iki banka veya iki çimento seçme)
+- İkisi de AL veya BEKLE kararı alabilir; Risk/getiri en az 1:2
 
 # BIST Günlük Öneri — ${dateStr}
 
-## ⚡ KARAR: [AL veya SAT veya BEKLE]
+## ⚡ KARAR: [AL veya BEKLE] — [BİRİNCİ_TICKER]
 
 | | |
 |---|---|
@@ -314,10 +361,8 @@ GÖREV — Aşağıdaki FORMATI BİREBİR kullanarak Markdown rapor yaz:
 > Yıl Sonu Beklentisi: Mevcut makro koşullar ve şirket fundamentalleri devam ederse yıl sonunda (31 Aralık 2026) beklenen fiyat seviyesi.
 | **Risk/Getiri** | 1:X.X |
 
----
-
 ## Neden?
-[Bu kağıdı seçme gerekçesi — max 3 cümle, somut ve net. Neden bu kağıt, neden şimdi.]
+[Bu kağıdı seçme gerekçesi — max 3 cümle, somut ve net.]
 
 ## Teknik Görüş
 [Momentum, RSI, hacim, MA pozisyonu — 2-3 cümle]
@@ -329,30 +374,51 @@ GÖREV — Aşağıdaki FORMATI BİREBİR kullanarak Markdown rapor yaz:
 [Haberler, katalizörler, sektör — 2-3 cümle]
 
 ## Risk
-Bu öneri ne zaman yanlış olur? [Tek cümle — en kritik risk faktörü]
+[Bu öneri ne zaman yanlış olur? — 1 cümle]
 
 ---
 > Yatırım tavsiyesi değildir. Karar destek aracıdır.
 
----RAPOR SONU---
+\`\`\`json
+${jsonBlock}
+\`\`\`
 
-Raporun TAMAMEN SONUNA (raporun dışına) şu JSON bloğunu ekle — bu blok kullanıcıya gösterilmeyecek, sadece sistem tarafından okunacak:
+---
+
+## ⚡ KARAR: [AL veya BEKLE] — [İKİNCİ_TICKER]
+
+| | |
+|---|---|
+| **Giriş bandı** | XXX – XXX TL |
+| **Stop-loss** | XXX TL |
+| **Hedef 1 (kısa vade, 1-5 gün)** | XXX TL |
+| **Hedef 2 (orta vade, 1-4 hafta)** | XXX TL |
+| **Yıl Sonu Beklentisi** | XXX TL |
+| **Risk seviyesi** | Düşük / Orta / Yüksek |
+
+> Yıl Sonu Beklentisi: Mevcut makro koşullar ve şirket fundamentalleri devam ederse yıl sonunda (31 Aralık 2026) beklenen fiyat seviyesi.
+| **Risk/Getiri** | 1:X.X |
+
+## Neden?
+[İkinci kağıdı seçme gerekçesi — max 3 cümle.]
+
+## Teknik Görüş
+[2-3 cümle]
+
+## Temel Görüş
+[2-3 cümle]
+
+## Piyasa Duygusu
+[2-3 cümle]
+
+## Risk
+[1 cümle]
+
+---
+> Yatırım tavsiyesi değildir. Karar destek aracıdır.
 
 \`\`\`json
-{
-  "date": "${today}",
-  "ticker": "BIST_KODU",
-  "entry_low": 0.00,
-  "entry_high": 0.00,
-  "stop_loss": 0.00,
-  "target_short_low": 0.00,
-  "target_short_high": 0.00,
-  "target_mid_low": 0.00,
-  "target_mid_high": 0.00,
-  "year_end": 0.00,
-  "risk_level": "Düşük/Orta/Yüksek",
-  "thesis_summary": "Tez özeti, maksimum 2 cümle."
-}
+${jsonBlock}
 \`\`\``;
 }
 

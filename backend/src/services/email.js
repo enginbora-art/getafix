@@ -196,9 +196,9 @@ function cleanReport(content) {
   return idx === -1 ? content : content.slice(idx);
 }
 
-async function sendForecastEmail(markdownReport, market, date) {
+async function sendForecastEmail(markdownReport, market, date, options = {}) {
   const dateStr = new Date(date).toLocaleDateString('tr-TR');
-  const subject = `${market} Günlük Öneri — ${dateStr}`;
+  const subject = options.subject || `${market} Günlük Öneri — ${dateStr}`;
   markdownReport = cleanReport(markdownReport);
 
   let users = [];

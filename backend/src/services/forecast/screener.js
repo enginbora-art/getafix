@@ -3,11 +3,11 @@ const prisma = require('../../lib/prisma');
 // Default filtre değerleri
 const FILTER_DEFAULTS = {
   BIST: {
-    prefilter_top_n: '8',
+    prefilter_top_n: '10',
     min_volume: '50000',
   },
   US: {
-    prefilter_top_n: '8',
+    prefilter_top_n: '10',
     min_dollar_volume: '5000000',
     min_price: '10',
     atr_min: '1.5',
