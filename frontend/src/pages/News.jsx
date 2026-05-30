@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { ChevronLeft, ChevronRight, Search, ExternalLink, Newspaper, AlertCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { tr } from 'date-fns/locale'
 import api from '../lib/api'
@@ -25,6 +26,128 @@ function SentimentBar({ bullish, bearish }) {
       <div style={{ height: 6, borderRadius: 3, background: 'rgba(248,113,113,0.3)', overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${b}%`, background: '#4ade80', borderRadius: 3, transition: 'width 0.4s' }} />
       </div>
+    </div>
+  )
+}
+
+const SIGNAL_CONFIG = {
+  SHORT_SQUEEZE:   { label: 'Short Squeeze',   color: '#f97316', bg: 'rgba(249,115,22,0.12)',  border: 'rgba(249,115,22,0.3)',  icon: '🔥' },
+  YUKARI_KIVRILMA: { label: 'Yukarı Kırılma',  color: '#22c55e', bg: 'rgba(34,197,94,0.12)',   border: 'rgba(34,197,94,0.3)',   icon: '⚡' },
+  GUCLU_HAREKET:   { label: 'Güçlü Hareket',   color: '#2dd4bf', bg: 'rgba(45,212,191,0.12)',  border: 'rgba(45,212,191,0.3)', icon: '📈' },
+  HACIM_PATLAMASI: { label: 'Hacim Patlaması', color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.3)', icon: '📊' },
+}
+
+function RadarPanel() {
+  const navigate = useNavigate()
+  const [results, setResults] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [lastScan, setLastScan] = useState(null)
+  const [activeSignal, setActiveSignal] = useState('ALL')
+
+  const fetchRadar = useCallback(async () => {
+    try {
+      const res = await api.get('/reports/scanner-results?limit=30')
+      const data = res.data.results || []
+      setResults(data)
+      if (data.length > 0) setLastScan(data[0].scannedAt)
+    } catch {
+      setResults([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchRadar()
+    const id = setInterval(fetchRadar, 5 * 60 * 1000)
+    return () => clearInterval(id)
+  }, [fetchRadar])
+
+  const filtered = activeSignal === 'ALL' ? results : results.filter((r) => r.signal === activeSignal)
+
+  return (
+    <div className="glass p-4 mb-4">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 15 }}>📡</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>Piyasa Radarı</span>
+          {loading && <div className="w-3 h-3 border border-teal-500 border-t-transparent rounded-full animate-spin" />}
+        </div>
+        {lastScan && (
+          <span style={{ fontSize: 11, color: '#475569' }}>
+            {format(new Date(lastScan), 'd MMM HH:mm', { locale: tr })}
+          </span>
+        )}
+      </div>
+
+      {/* Signal filters */}
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
+        {['ALL', 'SHORT_SQUEEZE', 'YUKARI_KIVRILMA', 'GUCLU_HAREKET', 'HACIM_PATLAMASI'].map((sig) => {
+          const cfg = SIGNAL_CONFIG[sig]
+          return (
+            <button
+              key={sig}
+              onClick={() => setActiveSignal(sig)}
+              style={{
+                fontSize: 10, padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontWeight: 500,
+                background: activeSignal === sig ? (cfg?.bg || 'rgba(255,255,255,0.1)') : 'transparent',
+                color: activeSignal === sig ? (cfg?.color || '#f1f5f9') : '#64748b',
+                border: `0.5px solid ${activeSignal === sig ? (cfg?.border || 'rgba(255,255,255,0.2)') : 'rgba(255,255,255,0.06)'}`,
+              }}
+            >
+              {sig === 'ALL' ? 'Tümü' : cfg?.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {!loading && filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <p style={{ fontSize: 12, color: '#475569' }}>Bugün 22:00'de otomatik tarama yapılacak.</p>
+          <p style={{ fontSize: 11, color: '#334155', marginTop: 4 }}>Manuel çalıştırmak için Admin → Manuel Analiz.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {filtered.slice(0, 10).map((r) => {
+            const cfg = SIGNAL_CONFIG[r.signal] || SIGNAL_CONFIG.GUCLU_HAREKET
+            const changeSign = r.changePct >= 0 ? '+' : ''
+            return (
+              <div
+                key={r.ticker + r.scannedAt}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '7px 10px', borderRadius: 7,
+                  background: cfg.bg, border: `0.5px solid ${cfg.border}`,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13 }}>{cfg.icon}</span>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9' }}>{r.ticker}</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: changeSign === '+' ? '#4ade80' : '#f87171' }}>
+                        {changeSign}{r.changePct.toFixed(1)}%
+                      </span>
+                      <span style={{ fontSize: 11, color: '#94a3b8' }}>x{r.volumeRatio.toFixed(1)} hacim</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: cfg.color, marginTop: 1 }}>{cfg.label}</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => navigate(`/analysis?ticker=${r.ticker}&market=US`)}
+                  style={{
+                    fontSize: 10, padding: '3px 8px', borderRadius: 4, cursor: 'pointer',
+                    background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)',
+                    color: '#94a3b8', whiteSpace: 'nowrap',
+                  }}
+                >
+                  Analiz Et →
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -327,6 +450,7 @@ export default function News() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
+          <RadarPanel />
           <h2 style={{ fontSize: 14, fontWeight: 600, color: '#94a3b8', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Canlı Haberler
           </h2>

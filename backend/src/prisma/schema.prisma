@@ -164,3 +164,17 @@ enum RequestStatus {
   DONE
   FAILED
 }
+
+model ScannerResult {
+  id          String   @id @default(cuid())
+  ticker      String
+  market      String   @default("US")
+  price       Float
+  changePct   Float
+  volumeRatio Float
+  marketCap   Float?
+  score       Float
+  name        String?
+  signal      String
+  scannedAt   DateTime @default(now())
+}

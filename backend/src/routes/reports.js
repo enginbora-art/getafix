@@ -249,6 +249,24 @@ router.get('/closed', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/reports/scanner-results?limit=20&signal=SHORT_SQUEEZE
+router.get('/scanner-results', authMiddleware, async (req, res) => {
+  try {
+    const { limit = 20, signal } = req.query;
+    const where = {};
+    if (signal) where.signal = signal;
+    const results = await prisma.scannerResult.findMany({
+      where,
+      orderBy: { scannedAt: 'desc' },
+      take: Math.min(parseInt(limit) || 20, 100),
+      distinct: ['ticker'],
+    });
+    res.json({ results });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/reports/market-news?ticker=AAPL
 router.get('/market-news', authMiddleware, async (req, res) => {
   if (!process.env.FINNHUB_API_KEY) {

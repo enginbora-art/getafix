@@ -40,6 +40,20 @@ function initScheduler() {
     timezone: 'Europe/Istanbul',
   });
 
+  // US Market Scanner (Katman B) — 22:00 İstanbul (16:00 EST, kapanmadan 1 saat önce)
+  cron.schedule('0 22 * * 1-5', async () => {
+    if (!isNyseOpen(new Date())) {
+      console.log('[scheduler] Scanner: NYSE kapalı, atlandı');
+      return;
+    }
+    const { runUsScanner } = require('./forecast/scanner');
+    try {
+      await runUsScanner();
+    } catch (err) {
+      console.error('[scheduler] Scanner HATA:', err.message);
+    }
+  }, { timezone: 'Europe/Istanbul' });
+
   console.log('[scheduler] Tüm zamanlamalar aktif');
 }
 

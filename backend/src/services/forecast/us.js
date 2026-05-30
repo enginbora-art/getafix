@@ -690,4 +690,4 @@ async function runManualAnalysis(ticker, onStep = null, context = {}) {
   return { result: rManager.text, currentPrice, reportId };
 }
 
-module.exports = { runUsForecast, runManualAnalysis };
+module.exports = { runUsForecast, runManualAnalysis, US_WATCHLIST };
